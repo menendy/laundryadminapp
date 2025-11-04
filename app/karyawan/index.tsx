@@ -9,7 +9,7 @@ import AppContainer from "../../components/layout/AppContainer";
 export default function KaryawanList() {
   const router = useRouter();
   const { karyawan, removeKaryawan } = useKaryawanStore();
-
+ // testing commit
   return (
    
         <AppContainer title="Data Karyawan">
@@ -21,7 +21,7 @@ export default function KaryawanList() {
             >
             + Tambah Karyawan
             </Button>
- 
+            
             <DataTable>
             <DataTable.Header>
                 <DataTable.Title>Nama</DataTable.Title>
