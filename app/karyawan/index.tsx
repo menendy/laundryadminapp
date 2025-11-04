@@ -21,7 +21,7 @@ export default function KaryawanList() {
             >
             + Tambah Karyawan
             </Button>
-
+ 
             <DataTable>
             <DataTable.Header>
                 <DataTable.Title>Nama</DataTable.Title>
