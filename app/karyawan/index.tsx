@@ -9,7 +9,7 @@ import AppContainer from "../../components/layout/AppContainer";
 export default function KaryawanList() {
   const router = useRouter();
   const { karyawan, removeKaryawan } = useKaryawanStore();
- // testing commit
+ // testing commit aja
   return (
    
         <AppContainer title="Data Karyawan">
