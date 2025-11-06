@@ -8,10 +8,16 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "start:web": "expo start --web --port 8082",
-    "start:mobile": "expo start --port 8081"
+    "start:mobile": "expo start --port 8081",
+     "start:local": "cross-env EXPO_PUBLIC_ENV=local EXPO_PUBLIC_API_BASE_URL=http://localhost:5001/laundry-apps-7f84c/asia-southeast2 expo start",
+     "start:dev": "cross-env EXPO_PUBLIC_ENV=development EXPO_PUBLIC_API_BASE_URL=https://asia-southeast2-laundry-apps-7f84c.cloudfunctions.net expo start",
+     "start:prod": "cross-env EXPO_PUBLIC_ENV=production EXPO_PUBLIC_API_BASE_URL=https://asia-southeast2-laundry-apps-prod.cloudfunctions.net expo start"
   },
   "dependencies": {
+    "axios": "^1.13.2",
+    "cross-env": "^10.1.0",
     "expo": "~54.0.20",
+    "expo-env": "^1.1.1",
     "expo-router": "~6.0.14",
     "expo-status-bar": "~3.0.8",
     "react": "19.1.0",
