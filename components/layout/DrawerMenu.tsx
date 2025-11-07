@@ -1,11 +1,15 @@
 import React from "react";
-import { ScrollView, View } from "react-native";
+import { ScrollView, View, useWindowDimensions, Platform } from "react-native";
 import { Drawer, Text, IconButton, Divider, Badge } from "react-native-paper";
 import { useRouter, usePathname } from "expo-router";
 
 export default function DrawerMenu({ onClose }: { onClose: () => void }) {
   const router = useRouter();
   const pathname = usePathname();
+  const { width } = useWindowDimensions();
+
+  const isWeb = Platform.OS === "web";
+  const isNarrowScreen = width < 768;
 
   const menuItems = [
     { label: "Dashboard", icon: "view-dashboard", path: "/" },
@@ -39,7 +43,11 @@ export default function DrawerMenu({ onClose }: { onClose: () => void }) {
             active={pathname === item.path}
             onPress={() => {
               router.push(item.path);
-              onClose();
+
+              // ✅ Hanya auto-close di mobile / web sempit
+              if (!isWeb || isNarrowScreen) {
+                onClose();
+              }
             }}
           />
         ))}

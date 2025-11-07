@@ -12,16 +12,18 @@ import { useSnackbarStore } from "../store/useSnackbarStore";
 export default function Layout() {
   const { width, height } = useWindowDimensions();
   const isWeb = Platform.OS === "web";
-
   const [isDrawerOpen, setDrawerOpen] = React.useState(false);
   const slideAnim = React.useRef(new Animated.Value(-width)).current;
 
+  const isNarrowScreen = width < 768; // batas responsive drawer full
+
+  // === Animasi open/close drawer ===
   const openDrawer = () => {
     setDrawerOpen(true);
     Animated.timing(slideAnim, {
       toValue: 0,
       duration: 250,
-      useNativeDriver: true,
+      useNativeDriver: Platform.OS !== "web", // mobile pakai native
     }).start();
   };
 
@@ -29,17 +31,24 @@ export default function Layout() {
     Animated.timing(slideAnim, {
       toValue: -width,
       duration: 250,
-      useNativeDriver: true,
+      useNativeDriver: Platform.OS !== "web",
     }).start(() => setDrawerOpen(false));
   };
 
-  // ✅ ambil store hanya sekali, bukan di JSX langsung
+  // === Snackbar Global ===
   const snackbar = useSnackbarStore();
+
+  // Auto close drawer kalau resize ke layar sempit
+  React.useEffect(() => {
+    if (isNarrowScreen && isDrawerOpen && Platform.OS === "web") {
+      closeDrawer();
+    }
+  }, [isNarrowScreen]);
 
   return (
     <SafeAreaProvider>
       <GestureHandlerRootView style={{ flex: 1 }}>
-        {/* ⬇️ Snackbar GLOBAL - ditempatkan di luar PaperProvider */}
+        {/* Snackbar global */}
         <AlertSnackbar
           visible={snackbar.visible}
           message={snackbar.message}
@@ -49,47 +58,122 @@ export default function Layout() {
 
         <PaperProvider>
           <View style={{ flex: 1, backgroundColor: "#f6f7f8" }}>
-            {/* Halaman utama */}
-            <Stack screenOptions={{ headerShown: false }} />
-
-            {/* Overlay transparan */}
+            {/* ================= Drawer ================= */}
             {isDrawerOpen && (
-              <View
-                onTouchEnd={closeDrawer}
-                style={{
-                  position: "absolute",
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  backgroundColor: "rgba(0,0,0,0.25)",
-                  zIndex: 98,
-                }}
-              />
+              <>
+                {/* --- Web mode --- */}
+                {isWeb && (
+                  <>
+                    {/* Overlay hanya jika layar sempit */}
+                    {isNarrowScreen && (
+                      <View
+                        onTouchEnd={closeDrawer}
+                        style={{
+                          position: "absolute",
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                          backgroundColor: "rgba(0,0,0,0.25)",
+                          zIndex: 98,
+                        }}
+                      />
+                    )}
+
+                    {/* Drawer web (responsive width) */}
+                    <Animated.View
+                      style={{
+                        position: "absolute",
+                        top: 0,
+                        left: 0,
+                        bottom: 0,
+                        width: isNarrowScreen
+                          ? width // full jika sempit
+                          : Math.min(width * 0.22, 280), // proporsional jika lebar
+                        backgroundColor: "#fff",
+                        borderRightWidth: isNarrowScreen ? 0 : 1,
+                        borderRightColor: "#e0e0e0",
+                        shadowColor: "#000",
+                        shadowOpacity: 0.15,
+                        shadowRadius: 5,
+                        transform: [
+                          {
+                            translateX: slideAnim.interpolate({
+                              inputRange: [-width, 0],
+                              outputRange: [-width, 0],
+                              extrapolate: "clamp",
+                            }),
+                          },
+                        ],
+                        zIndex: 99,
+                        elevation: 8,
+                      }}
+                    >
+                      <DrawerMenu onClose={closeDrawer} />
+                    </Animated.View>
+                  </>
+                )}
+
+                {/* --- Mobile mode --- */}
+                {!isWeb && (
+                  <>
+                    {/* Overlay transparan */}
+                    <View
+                      onTouchEnd={closeDrawer}
+                      style={{
+                        position: "absolute",
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        backgroundColor: "rgba(0,0,0,0.25)",
+                        zIndex: 98,
+                      }}
+                    />
+                    <Animated.View
+                      style={{
+                        position: "absolute",
+                        top: 0,
+                        left: 0,
+                        bottom: 0,
+                        width,
+                        height,
+                        backgroundColor: "#fff",
+                        transform: [{ translateX: slideAnim }],
+                        zIndex: 99,
+                        elevation: 8,
+                        shadowColor: "#000",
+                        shadowOpacity: 0.3,
+                        shadowRadius: 5,
+                      }}
+                    >
+                      <DrawerMenu onClose={closeDrawer} />
+                    </Animated.View>
+                  </>
+                )}
+              </>
             )}
 
-            {/* Drawer Overlay */}
+            {/* ================= Konten Utama ================= */}
             <Animated.View
               style={{
-                position: "absolute",
-                top: 0,
-                left: 0,
-                bottom: 0,
-                width: isWeb ? Math.min(width * 0.8, 320) : width,
-                height: isWeb ? "100%" : height,
-                backgroundColor: "#fff",
-                transform: [{ translateX: slideAnim }],
-                zIndex: 99,
-                elevation: 8,
-                shadowColor: "#000",
-                shadowOpacity: 0.3,
-                shadowRadius: 5,
+                flex: 1,
+                backgroundColor: "#f6f7f8",
+                // hanya web lebar yang kontennya bergeser
+                marginLeft:
+                  isWeb && !isNarrowScreen && isDrawerOpen
+                    ? Math.min(width * 0.22, 280)
+                    : 0,
+                transition:
+                  isWeb && !isNarrowScreen
+                    ? "margin 0.25s ease"
+                    : undefined,
               }}
             >
-              {isDrawerOpen && <DrawerMenu onClose={closeDrawer} />}
+              <Stack screenOptions={{ headerShown: false }} />
             </Animated.View>
 
-            {/* Bottom Navigation */}
+            {/* ================= Bottom Navigation ================= */}
             <View
               style={{
                 position: "absolute",

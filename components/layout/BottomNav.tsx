@@ -4,7 +4,7 @@ import {
   TouchableOpacity,
   Text,
   Platform,
-  Dimensions,
+  useWindowDimensions,
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useRouter, usePathname } from "expo-router";
@@ -14,29 +14,36 @@ export default function BottomNav({ onMenuPress, onMenuClose, isDrawerOpen }) {
   const router = useRouter();
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
+  const { width, height } = useWindowDimensions(); // <-- reactive
+  const isWeb = Platform.OS === "web";
+  const isNarrowScreen = width < 768; // sama breakpoint seperti layout
 
-  // 🔍 Deteksi tinggi layar (untuk menyesuaikan proporsi tombol)
-  const { height } = Dimensions.get("window");
-
-  // Hitung posisi tombol tengah secara adaptif
+  // Hitung posisi tombol tengah secara adaptif (tetap seperti sebelumnya)
   const getAdaptiveMarginBottom = () => {
     if (Platform.OS === "android") {
-      if (height < 700) return Math.max(insets.bottom - 4, 0); // HP kecil
-      if (height < 820) return Math.max(insets.bottom - 8, 0); // HP sedang
-      return Math.max(insets.bottom - 12, 0); // HP besar / tablet
+      if (height < 700) return Math.max(insets.bottom - 4, 0);
+      if (height < 820) return Math.max(insets.bottom - 8, 0);
+      return Math.max(insets.bottom - 12, 0);
     } else if (Platform.OS === "ios") {
-      return Math.max(insets.bottom - 6, 0); // iPhone (auto handle notch)
+      return Math.max(insets.bottom - 6, 0);
     }
-    // Web fallback
-    return 8;
+    return 8; // web fallback
   };
 
   const adaptiveMarginBottom = getAdaptiveMarginBottom();
 
-  // ✅ Helper untuk navigasi dan auto-tutup menu
-  const navigateAndClose = (path: string) => {
-    if (onMenuClose) onMenuClose(); // tutup menu jika sedang terbuka
-    router.push(path); // lalu navigasi
+  // NAV helper:
+  // - Jika web & lebar >= 768 => jangan tutup drawer saat navigasi
+  // - Jika mobile atau web sempit => tutup drawer setelah navigasi
+  const navigateAndMaybeClose = (path: string) => {
+    // First navigate (kehilangan atau delay kecil di SPA tidak masalah)
+    router.push(path);
+
+    // kemudian close jika diperlukan
+    const shouldAutoClose = !isWeb || isNarrowScreen;
+    if (shouldAutoClose && onMenuClose) {
+      onMenuClose();
+    }
   };
 
   return (
@@ -60,10 +67,9 @@ export default function BottomNav({ onMenuPress, onMenuClose, isDrawerOpen }) {
           justifyContent: "space-evenly",
         }}
       >
-        {/* Tombol Dashboard */}
         <TouchableOpacity
           style={{ alignItems: "center" }}
-          onPress={() => navigateAndClose("/")}
+          onPress={() => navigateAndMaybeClose("/")}
         >
           <MaterialIcons
             name="home"
@@ -80,10 +86,9 @@ export default function BottomNav({ onMenuPress, onMenuClose, isDrawerOpen }) {
           </Text>
         </TouchableOpacity>
 
-        {/* Tombol Karyawan */}
         <TouchableOpacity
           style={{ alignItems: "center" }}
-          onPress={() => navigateAndClose("/karyawan")}
+          onPress={() => navigateAndMaybeClose("/karyawan")}
         >
           <MaterialIcons
             name="groups"
@@ -139,10 +144,9 @@ export default function BottomNav({ onMenuPress, onMenuClose, isDrawerOpen }) {
           justifyContent: "space-evenly",
         }}
       >
-        {/* Tombol Outlet */}
         <TouchableOpacity
           style={{ alignItems: "center" }}
-          onPress={() => navigateAndClose("/outlet")}
+          onPress={() => navigateAndMaybeClose("/outlet")}
         >
           <MaterialIcons
             name="store"
@@ -159,10 +163,9 @@ export default function BottomNav({ onMenuPress, onMenuClose, isDrawerOpen }) {
           </Text>
         </TouchableOpacity>
 
-        {/* Tombol Profil */}
         <TouchableOpacity
           style={{ alignItems: "center" }}
-          onPress={() => navigateAndClose("/profil")}
+          onPress={() => navigateAndMaybeClose("/profil")}
         >
           <MaterialIcons
             name="person"

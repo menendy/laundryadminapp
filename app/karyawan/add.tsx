@@ -1,7 +1,9 @@
 import React, { useState } from "react";
-import { View, Text, TextInput, Button, Platform } from "react-native";
+import { View, Button, ScrollView } from "react-native";
 import { addMitra } from "../../services/api/mitraService";
 import { useSnackbarStore } from "../../store/useSnackbarStore";
+import HeaderBar from "../../components/ui/HeaderBar";
+import ValidatedInput from "../../components/ui/ValidatedInput";
 
 export default function AddMitraScreen() {
   const showSnackbar = useSnackbarStore((s) => s.showSnackbar);
@@ -9,100 +11,103 @@ export default function AddMitraScreen() {
   const [nama, setNama] = useState("");
   const [telp, setTelp] = useState("");
   const [alamat, setAlamat] = useState("");
+  const [errors, setErrors] = useState<{ nama?: string; telp?: string; alamat?: string }>({});
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async () => {
-    if (!nama || !telp || !alamat) {
-      showSnackbar("Lengkapi semua data", "error");
+  const validate = () => {
+    const newErrors: any = {};
+    if (!nama.trim()) newErrors.nama = "Nama Mitra tidak boleh kosong";
+    if (!telp.trim()) newErrors.telp = "Nomor Telepon tidak boleh kosong";
+    if (!alamat.trim()) newErrors.alamat = "Alamat tidak boleh kosong";
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+       const handleSubmit = async () => {
+  if (!validate()) {
+    showSnackbar("Lengkapi semua data dengan benar", "error");
+    return;
+  }
+
+  try {
+    setLoading(true);
+    const result = await addMitra({ nama, telp, alamat });
+
+    // ⚙️ Handle error structured dari backend
+    if (result.status >= 400 && result.field) {
+      setErrors({ [result.field]: result.message });
+      showSnackbar(`❌ ${result.message}`, "error");
       return;
     }
 
-    try {
-      setLoading(true);
-      const result = await addMitra({ nama, telp, alamat });
-      showSnackbar(`✅ Berhasil menambahkan Mitra: ${result.id}`, "success");
-      setNama("");
-      setTelp("");
-      setAlamat("");
-    } catch (err) {
-      console.error(err);
-      showSnackbar("❌ Gagal menambahkan mitra", "error");
-    } finally {
-      setLoading(false);
+    if (result.status >= 400 && !result.field) {
+      // error umum
+      showSnackbar(`❌ ${result.message}`, "error");
+      return;
     }
-  };
+
+    // ✅ Berhasil
+    showSnackbar(`✅ ${result.message}`, "success");
+    setNama("");
+    setTelp("");
+    setAlamat("");
+    setErrors({});
+  } catch (err: any) {
+    console.error("🔥 Gagal add mitra:", err);
+    showSnackbar("Terjadi kesalahan koneksi", "error");
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <View style={{ flex: 1, backgroundColor: "#f9f9f9" }}>
-      {/* 🔹 Header Title */}
-      <View
-        style={{
-          paddingTop: Platform.OS === "android" ? 40 : 60, // jarak aman dari status bar
-          paddingBottom: 16,
-          backgroundColor: "#1976D2",
-          alignItems: "center",
-          justifyContent: "center",
-          shadowColor: "#000",
-          shadowOpacity: 0.2,
-          shadowRadius: 3,
-          elevation: 4,
-        }}
-      >
-        <Text
-          style={{
-            fontSize: 20,
-            fontWeight: "700",
-            color: "white",
-            letterSpacing: 0.5,
-          }}
-        >
-          Tambah Mitra
-        </Text>
-      </View>
+      <HeaderBar title="Tambah Mitra" showBackButton />
 
-      {/* 🔹 Form Input */}
-      <View style={{ padding: 20 }}>
-        <TextInput
-          placeholder="Nama Mitra"
+      <ScrollView contentContainerStyle={{ padding: 20 }}>
+        <ValidatedInput
+          label="Nama Mitra"
+          required
+          placeholder="Contoh: Harmania Laundry"
           value={nama}
-          onChangeText={setNama}
-          style={{
-            borderBottomWidth: 1,
-            borderColor: "#ccc",
-            marginBottom: 10,
-            paddingVertical: 6,
+          onChangeText={(text) => {
+            setNama(text);
+            if (errors.nama) setErrors({ ...errors, nama: undefined });
           }}
+          error={errors.nama}
         />
-        <TextInput
-          placeholder="Nomor Telepon"
-          value={telp}
-          onChangeText={setTelp}
-          style={{
-            borderBottomWidth: 1,
-            borderColor: "#ccc",
-            marginBottom: 10,
-            paddingVertical: 6,
-          }}
+
+        <ValidatedInput
+          label="Nomor Telepon"
+          required
           keyboardType="phone-pad"
-        />
-        <TextInput
-          placeholder="Alamat"
-          value={alamat}
-          onChangeText={setAlamat}
-          style={{
-            borderBottomWidth: 1,
-            borderColor: "#ccc",
-            marginBottom: 20,
-            paddingVertical: 6,
+          placeholder="Contoh: 08123456789"
+          value={telp}
+          onChangeText={(text) => {
+            setTelp(text);
+            if (errors.telp) setErrors({ ...errors, telp: undefined });
           }}
+          error={errors.telp}
         />
+
+        <ValidatedInput
+          label="Alamat"
+          required
+          placeholder="Contoh: Jl. Fatmawati No. 45, Jakarta Selatan"
+          value={alamat}
+          onChangeText={(text) => {
+            setAlamat(text);
+            if (errors.alamat) setErrors({ ...errors, alamat: undefined });
+          }}
+          error={errors.alamat}
+        />
+
         <Button
           title={loading ? "Menyimpan..." : "Tambah Mitra"}
           onPress={handleSubmit}
           disabled={loading}
-          color={Platform.OS === "ios" ? "#1976D2" : undefined}
         />
-      </View>
+      </ScrollView>
     </View>
   );
 }
