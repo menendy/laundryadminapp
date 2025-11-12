@@ -12,45 +12,15 @@ export interface MitraResponse {
   message?: string;
   field?: string | null;
   status?: number;
+  errors?: { field: string | null; message: string }[];
 }
 
 /**
- * Menambahkan data Mitra baru
- * - Mengembalikan structured response dari backend
- * - Jika error (400/500), tetap dikembalikan dalam format {status, field, message}
+ * 🚀 Tambah mitra baru
+ * - Tidak perlu try/catch lagi
+ * - Karena error sudah ditangani oleh interceptor
  */
 export const addMitra = async (payload: MitraPayload): Promise<MitraResponse> => {
-  try {
-    const res = await api.post("/addMitra_v2", payload);
-    return {
-      ...res.data,
-      status: res.status,
-    };
-  } catch (err: any) {
-    // ✅ Tangkap error dari backend (400, 500, dll)
-    if (err.response) {
-      // Server memberikan respon error terstruktur
-      return {
-        field: err.response.data?.field ?? null,
-        message: err.response.data?.message ?? "Terjadi kesalahan pada server",
-        status: err.response.status,
-      };
-    }
-
-    // ❌ Kalau tidak ada response (misalnya koneksi terputus)
-    return {
-      field: null,
-      message: err.message || "Tidak dapat terhubung ke server",
-      status: 0,
-    };
-  }
-};
-
-/**
- * Ambil semua data Mitra
- * (Tidak diubah)
- */
-export const getAllMitra = async () => {
-  const res = await api.get("/getAllMitra");
+  const res = await api.post("/addMitra_v2", payload);
   return res.data;
 };

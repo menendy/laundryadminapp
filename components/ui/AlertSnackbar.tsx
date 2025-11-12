@@ -7,7 +7,6 @@ import {
   Easing,
   Platform,
   StatusBar,
-  Dimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -27,7 +26,6 @@ export default function AlertSnackbar({
   const insets = useSafeAreaInsets();
   const translateY = useRef(new Animated.Value(-120)).current;
   const opacity = useRef(new Animated.Value(0)).current;
-  const screenWidth = Dimensions.get("window").width;
 
   const bgColor =
     type === "success"
@@ -71,11 +69,11 @@ export default function AlertSnackbar({
     }
   }, [visible]);
 
-  // 🧭 Posisi ideal tepat di bawah status bar / notch / jam
+  // Dinamis offset (agar tidak tertutup status bar)
   const topOffset =
     Platform.OS === "android"
-      ? (StatusBar.currentHeight ?? 0) + 4
-      : insets.top + 4;
+      ? (StatusBar.currentHeight ?? 24) + 10
+      : insets.top + 10;
 
   return (
     <Animated.View
@@ -86,7 +84,6 @@ export default function AlertSnackbar({
           transform: [{ translateY }],
           opacity,
           top: topOffset,
-          width: screenWidth,
         },
       ]}
     >
@@ -107,20 +104,18 @@ const styles = StyleSheet.create({
     elevation: 999999,
   },
   snackbar: {
-    width: "98%",
-    borderRadius: 10,
+    borderRadius: 8,
     paddingVertical: 10,
     paddingHorizontal: 16,
-    marginHorizontal: "1%",
+    marginHorizontal: 10,
     shadowColor: "#000",
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
-    elevation: 6,
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 8,
   },
   text: {
     color: "white",
     fontWeight: "600",
     fontSize: 15,
-    textAlign: "center",
   },
 });

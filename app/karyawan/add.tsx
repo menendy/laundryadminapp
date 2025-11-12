@@ -1,18 +1,21 @@
 import React, { useState } from "react";
-import { View, Button, ScrollView } from "react-native";
-import { addMitra } from "../../services/api/mitraService";
-import { useSnackbarStore } from "../../store/useSnackbarStore";
-import HeaderBar from "../../components/ui/HeaderBar";
+import { View, ScrollView } from "react-native";
+import { Button } from "react-native-paper";
+import { useRouter } from "expo-router";
+import AppHeaderActions from "../../components/ui/AppHeaderActions";
 import ValidatedInput from "../../components/ui/ValidatedInput";
+import { useSnackbarStore } from "../../store/useSnackbarStore";
+import { addMitra } from "../../services/api/mitraService";
+import { handleBackendError } from "../../utils/handleBackendError";
 
 export default function AddMitraScreen() {
+  const router = useRouter();
   const showSnackbar = useSnackbarStore((s) => s.showSnackbar);
-
   const [nama, setNama] = useState("");
   const [telp, setTelp] = useState("");
   const [alamat, setAlamat] = useState("");
-  const [errors, setErrors] = useState<{ nama?: string; telp?: string; alamat?: string }>({});
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState<{ nama?: string; telp?: string; alamat?: string }>({});
 
   const validate = () => {
     const newErrors: any = {};
@@ -23,46 +26,34 @@ export default function AddMitraScreen() {
     return Object.keys(newErrors).length === 0;
   };
 
-       const handleSubmit = async () => {
-  if (!validate()) {
-    showSnackbar("Lengkapi semua data dengan benar", "error");
-    return;
-  }
-
-  try {
-    setLoading(true);
-    const result = await addMitra({ nama, telp, alamat });
-
-    // ⚙️ Handle error structured dari backend
-    if (result.status >= 400 && result.field) {
-      setErrors({ [result.field]: result.message });
-      showSnackbar(`❌ ${result.message}`, "error");
+  const handleSubmit = async () => {
+    if (!validate()) {
+      showSnackbar("Lengkapi semua data dengan benar", "error");
       return;
     }
 
-    if (result.status >= 400 && !result.field) {
-      // error umum
-      showSnackbar(`❌ ${result.message}`, "error");
-      return;
+    try {
+      setLoading(true);
+      const result = await addMitra({ nama, telp, alamat });
+      const ok = handleBackendError(result, setErrors, showSnackbar);
+      if (!ok) return;
+      showSnackbar(`✅ ${result.message}`, "success");
+      router.back();
+    } catch (err) {
+      console.error("🔥 Error add mitra:", err);
+      showSnackbar("Terjadi kesalahan koneksi", "error");
+    } finally {
+      setLoading(false);
     }
-
-    // ✅ Berhasil
-    showSnackbar(`✅ ${result.message}`, "success");
-    setNama("");
-    setTelp("");
-    setAlamat("");
-    setErrors({});
-  } catch (err: any) {
-    console.error("🔥 Gagal add mitra:", err);
-    showSnackbar("Terjadi kesalahan koneksi", "error");
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   return (
     <View style={{ flex: 1, backgroundColor: "#f9f9f9" }}>
-      <HeaderBar title="Tambah Mitra" showBackButton />
+      {/* ✅ Header dengan tombol back dan simpan */}
+      <AppHeaderActions
+        title="Tambah Mitra"
+        showBack={true}
+      />
 
       <ScrollView contentContainerStyle={{ padding: 20 }}>
         <ValidatedInput
@@ -70,43 +61,36 @@ export default function AddMitraScreen() {
           required
           placeholder="Contoh: Harmania Laundry"
           value={nama}
-          onChangeText={(text) => {
-            setNama(text);
-            if (errors.nama) setErrors({ ...errors, nama: undefined });
-          }}
+          onChangeText={setNama}
           error={errors.nama}
         />
-
         <ValidatedInput
           label="Nomor Telepon"
           required
           keyboardType="phone-pad"
           placeholder="Contoh: 08123456789"
           value={telp}
-          onChangeText={(text) => {
-            setTelp(text);
-            if (errors.telp) setErrors({ ...errors, telp: undefined });
-          }}
+          onChangeText={setTelp}
           error={errors.telp}
         />
-
         <ValidatedInput
           label="Alamat"
           required
           placeholder="Contoh: Jl. Fatmawati No. 45, Jakarta Selatan"
           value={alamat}
-          onChangeText={(text) => {
-            setAlamat(text);
-            if (errors.alamat) setErrors({ ...errors, alamat: undefined });
-          }}
+          onChangeText={setAlamat}
           error={errors.alamat}
         />
 
         <Button
-          title={loading ? "Menyimpan..." : "Tambah Mitra"}
+          mode="contained"
           onPress={handleSubmit}
+          loading={loading}
           disabled={loading}
-        />
+          style={{ marginTop: 16 }}
+        >
+          {loading ? "Menyimpan..." : "Tambah Mitra"}
+        </Button>
       </ScrollView>
     </View>
   );

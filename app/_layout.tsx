@@ -1,29 +1,43 @@
 import React from "react";
 import { View, Platform, useWindowDimensions, Animated } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { PaperProvider } from "react-native-paper";
+import { MD3LightTheme as DefaultTheme, PaperProvider } from "react-native-paper";
 import { Stack } from "expo-router";
+import { SafeAreaProvider } from "react-native-safe-area-context";
+
 import DrawerMenu from "../components/layout/DrawerMenu";
 import BottomNav from "../components/layout/BottomNav";
-import { SafeAreaProvider } from "react-native-safe-area-context";
 import AlertSnackbar from "../components/ui/AlertSnackbar";
+import OfflineBanner from "../components/ui/OfflineBanner";
 import { useSnackbarStore } from "../store/useSnackbarStore";
+
+// ✅ Tema global react-native-paper
+const theme = {
+  ...DefaultTheme,
+  roundness: 0,
+  colors: {
+    ...DefaultTheme.colors,
+    primary: "#1976d2", // warna biru utama
+    onPrimary: "#ffffff",
+    secondary: "#4caf50",
+    error: "#d32f2f",
+  },
+};
 
 export default function Layout() {
   const { width, height } = useWindowDimensions();
   const isWeb = Platform.OS === "web";
   const [isDrawerOpen, setDrawerOpen] = React.useState(false);
   const slideAnim = React.useRef(new Animated.Value(-width)).current;
+  const snackbar = useSnackbarStore();
+  const isNarrowScreen = width < 768;
 
-  const isNarrowScreen = width < 768; // batas responsive drawer full
-
-  // === Animasi open/close drawer ===
   const openDrawer = () => {
     setDrawerOpen(true);
     Animated.timing(slideAnim, {
       toValue: 0,
       duration: 250,
-      useNativeDriver: Platform.OS !== "web", // mobile pakai native
+      useNativeDriver: Platform.OS !== "web",
     }).start();
   };
 
@@ -35,10 +49,6 @@ export default function Layout() {
     }).start(() => setDrawerOpen(false));
   };
 
-  // === Snackbar Global ===
-  const snackbar = useSnackbarStore();
-
-  // Auto close drawer kalau resize ke layar sempit
   React.useEffect(() => {
     if (isNarrowScreen && isDrawerOpen && Platform.OS === "web") {
       closeDrawer();
@@ -47,24 +57,23 @@ export default function Layout() {
 
   return (
     <SafeAreaProvider>
-      <GestureHandlerRootView style={{ flex: 1 }}>
-        {/* Snackbar global */}
-        <AlertSnackbar
-          visible={snackbar.visible}
-          message={snackbar.message}
-          onDismiss={snackbar.hideSnackbar}
-          type={snackbar.type}
-        />
+      {/* ✅ Hanya satu PaperProvider */}
+      <PaperProvider theme={theme}>
+        <OfflineBanner />
+        <GestureHandlerRootView style={{ flex: 1 }}>
+          <AlertSnackbar
+            visible={snackbar.visible}
+            message={snackbar.message}
+            onDismiss={snackbar.hideSnackbar}
+            type={snackbar.type}
+          />
 
-        <PaperProvider>
           <View style={{ flex: 1, backgroundColor: "#f6f7f8" }}>
-            {/* ================= Drawer ================= */}
+            {/* Drawer */}
             {isDrawerOpen && (
               <>
-                {/* --- Web mode --- */}
-                {isWeb && (
+                {isWeb ? (
                   <>
-                    {/* Overlay hanya jika layar sempit */}
                     {isNarrowScreen && (
                       <View
                         onTouchEnd={closeDrawer}
@@ -79,17 +88,13 @@ export default function Layout() {
                         }}
                       />
                     )}
-
-                    {/* Drawer web (responsive width) */}
                     <Animated.View
                       style={{
                         position: "absolute",
                         top: 0,
                         left: 0,
                         bottom: 0,
-                        width: isNarrowScreen
-                          ? width // full jika sempit
-                          : Math.min(width * 0.22, 280), // proporsional jika lebar
+                        width: isNarrowScreen ? width : Math.min(width * 0.22, 280),
                         backgroundColor: "#fff",
                         borderRightWidth: isNarrowScreen ? 0 : 1,
                         borderRightColor: "#e0e0e0",
@@ -112,12 +117,8 @@ export default function Layout() {
                       <DrawerMenu onClose={closeDrawer} />
                     </Animated.View>
                   </>
-                )}
-
-                {/* --- Mobile mode --- */}
-                {!isWeb && (
+                ) : (
                   <>
-                    {/* Overlay transparan */}
                     <View
                       onTouchEnd={closeDrawer}
                       style={{
@@ -154,26 +155,23 @@ export default function Layout() {
               </>
             )}
 
-            {/* ================= Konten Utama ================= */}
+            {/* Konten utama */}
             <Animated.View
               style={{
                 flex: 1,
                 backgroundColor: "#f6f7f8",
-                // hanya web lebar yang kontennya bergeser
                 marginLeft:
                   isWeb && !isNarrowScreen && isDrawerOpen
                     ? Math.min(width * 0.22, 280)
                     : 0,
                 transition:
-                  isWeb && !isNarrowScreen
-                    ? "margin 0.25s ease"
-                    : undefined,
+                  isWeb && !isNarrowScreen ? "margin 0.25s ease" : undefined,
               }}
             >
               <Stack screenOptions={{ headerShown: false }} />
             </Animated.View>
 
-            {/* ================= Bottom Navigation ================= */}
+            {/* Bottom Navigation */}
             <View
               style={{
                 position: "absolute",
@@ -190,8 +188,8 @@ export default function Layout() {
               />
             </View>
           </View>
-        </PaperProvider>
-      </GestureHandlerRootView>
+        </GestureHandlerRootView>
+      </PaperProvider>
     </SafeAreaProvider>
   );
 }
