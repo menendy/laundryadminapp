@@ -6,6 +6,36 @@ export interface MitraPayload {
   alamat: string;
 }
 
+export interface MitraListResponse {
+  success: boolean;
+  data: any[];
+  nextCursor?: string | null;
+  limit?: number;
+  total?: number;
+}
+
+export const getMitraList = async (
+  search: string | null = null,
+  cursor: string | null = null,
+  limit = 10,
+  mode: "semua" | "nama" | "telp" = "semua"
+): Promise<MitraListResponse> => {
+  try {
+    const params = new URLSearchParams();
+    if (search) params.append("search", search);
+    if (cursor) params.append("cursor", cursor);
+    params.append("limit", limit.toString());
+    params.append("mode", mode);
+
+    const res = await api.get(`/getMitraList?${params.toString()}`);
+    return res.data;
+  } catch (err: any) {
+    console.error("❌ getMitraList error:", err);
+    return { success: false, data: [] };
+  }
+};
+
+
 export interface MitraResponse {
   success?: boolean;
   id?: string;

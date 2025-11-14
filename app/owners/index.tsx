@@ -20,45 +20,44 @@ import {
 } from "react-native-paper";
 import { useRouter } from "expo-router";
 
-import { getMitraList } from "../../services/api/mitraService";
+import { getOwnerList } from "../../services/api/ownersService";
 import AppHeaderList from "../../components/ui/AppHeaderList";
 import AppSearchBarBottomSheet from "../../components/ui/AppSearchBarBottomSheet";
 
 /* ITEM */
-const MitraItem = memo(
-  ({ item, onDetail }: any) => (
-    <Card
-      style={{
-        backgroundColor: "#fff",
-        borderRadius: 10,
-        borderWidth: 1,
-        borderColor: "#eee",
-        marginHorizontal: 12,
-        marginBottom: 12,
-      }}
-    >
-      <List.Item
-        title={item.nama}
-        description={`Alamat: ${item.alamat}\nTelp: ${item.telp}`}
-        right={() => (
-          <Button textColor="#1976d2" onPress={onDetail}>
-            Detail
-          </Button>
-        )}
-      />
-    </Card>
-  )
-);
+const OwnerItem = memo(({ item, onDetail }: any) => (
+  <Card
+    style={{
+      backgroundColor: "#fff",
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: "#eee",
+      marginHorizontal: 12,
+      marginBottom: 12,
+    }}
+  >
+    <List.Item
+      title={item.name}
+      description={`${item.address}\nTelp: ${item.phone}\nEmail: ${item.email}`}
+      right={() => (
+        <Button textColor="#1976d2" onPress={onDetail}>
+          Detail
+        </Button>
+      )}
+    />
+  </Card>
+));
 
-export default function MitraListScreen() {
+export default function OwnerListScreen() {
   const router = useRouter();
 
-  const [mitra, setMitra] = useState<any[]>([]);
+  const [owners, setOwners] = useState<any[]>([]);
   const [search, setSearch] = useState("");
   const [cursor, setCursor] = useState<string | null>(null);
+
+  const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [hasMore, setHasMore] = useState(true);
 
   const didInitialLoad = useRef(false);
   const fetchLock = useRef(false);
@@ -68,28 +67,16 @@ export default function MitraListScreen() {
   const safeFetch = useCallback(
     async (reset = false) => {
       if (fetchLock.current) return;
-
       fetchLock.current = true;
       setLoading(true);
 
       try {
-        const result = await getMitraList(
-          search.trim() || null,
-          reset ? null : cursor,
-          10,
-          "semua"
-        );
+        const result = await getOwnerList(search.trim() || null, reset ? null : cursor, 10);
 
         if (result.success) {
-          setMitra((prev) => {
-            const merged = reset
-              ? result.data
-              : [...prev, ...result.data];
-
-            const unique = Array.from(
-              new Map(merged.map((i) => [i.id, i])).values()
-            );
-
+          setOwners((prev) => {
+            const merged = reset ? result.data : [...prev, ...result.data];
+            const unique = Array.from(new Map(merged.map((i) => [i.id, i])).values());
             return unique;
           });
 
@@ -97,7 +84,7 @@ export default function MitraListScreen() {
           setHasMore(!!result.nextCursor);
         }
       } catch (err) {
-        console.error("🔥 Error fetch mitra:", err);
+        console.error("🔥 Error fetch owners:", err);
       } finally {
         fetchLock.current = false;
         setLoading(false);
@@ -111,17 +98,13 @@ export default function MitraListScreen() {
     didInitialLoad.current = true;
 
     safeFetch(true).then(() => {
-      setTimeout(() => {
-        endReachedLock.current = false;
-      }, 300);
+      setTimeout(() => (endReachedLock.current = false), 300);
     });
   }, []);
 
   useEffect(() => {
     if (!didInitialLoad.current) return;
-
-    if (debounceTimer.current)
-      clearTimeout(debounceTimer.current);
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
 
     if (search.trim() === "") {
       setCursor(null);
@@ -133,6 +116,10 @@ export default function MitraListScreen() {
       setCursor(null);
       safeFetch(true);
     }, 500);
+
+    return () => {
+      if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    };
   }, [search]);
 
   const onRefresh = async () => {
@@ -148,61 +135,36 @@ export default function MitraListScreen() {
     }, 300);
   };
 
-  const renderItem = useCallback(
-    ({ item }: any) => (
-      <MitraItem
-        item={item}
-        onDetail={() => router.push(`/karyawan/${item.id}`)}
-      />
-    ),
-    []
-  );
+  const renderItem = useCallback(({ item }: any) => <OwnerItem item={item} onDetail={() => router.push(`/owners/${item.id}`)} />, []);
 
   return (
     <View style={{ flex: 1, backgroundColor: "#f9f9f9" }}>
-      <AppHeaderList
-        title="Data Mitra"
-        onAdd={() => router.push("/karyawan/add")}
-      />
+      <AppHeaderList title="Daftar Owner" onAdd={() => router.push("/owners/add")} />
 
       <AppSearchBarBottomSheet
         value={search}
         onChangeText={setSearch}
         mode="semua"
         onChangeMode={() => {}}
-        placeholder="Cari nama / telp..."
-        categories={[
-          { label: "Semua", value: "semua" },
-          { label: "Nama", value: "nama" },
-          { label: "Telepon", value: "telp" },
-        ]}
+        placeholder="Cari owner..."
+        categories={[{ label: "Nama / Email", value: "semua" }]}
         defaultMode="semua"
       />
 
       <FlatList
-        data={mitra}
+        data={owners}
         keyExtractor={(i) => i.id}
         renderItem={renderItem}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         onEndReachedThreshold={0.4}
         onEndReached={() => {
           if (endReachedLock.current) return;
           if (!loading && hasMore) safeFetch();
         }}
         ListEmptyComponent={
-          !loading && (
-            <Text style={{ textAlign: "center", marginTop: 20 }}>
-              Belum ada data mitra.
-            </Text>
-          )
+          !loading && <Text style={{ textAlign: "center", marginTop: 20, color: "#777" }}>Belum ada owner</Text>
         }
-        ListFooterComponent={
-          loading && mitra.length > 0 ? (
-            <ActivityIndicator style={{ marginVertical: 20 }} />
-          ) : null
-        }
+        ListFooterComponent={loading && owners.length > 0 ? <ActivityIndicator style={{ marginVertical: 20 }} /> : null}
         keyboardShouldPersistTaps="handled"
         onScrollBeginDrag={() => Keyboard.dismiss()}
       />

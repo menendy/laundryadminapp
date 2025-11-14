@@ -20,40 +20,38 @@ import {
 } from "react-native-paper";
 import { useRouter } from "expo-router";
 
-import { getMitraList } from "../../services/api/mitraService";
+import { getAccessList } from "../../services/api/accessService";
 import AppHeaderList from "../../components/ui/AppHeaderList";
 import AppSearchBarBottomSheet from "../../components/ui/AppSearchBarBottomSheet";
 
 /* ITEM */
-const MitraItem = memo(
-  ({ item, onDetail }: any) => (
-    <Card
-      style={{
-        backgroundColor: "#fff",
-        borderRadius: 10,
-        borderWidth: 1,
-        borderColor: "#eee",
-        marginHorizontal: 12,
-        marginBottom: 12,
-      }}
-    >
-      <List.Item
-        title={item.nama}
-        description={`Alamat: ${item.alamat}\nTelp: ${item.telp}`}
-        right={() => (
-          <Button textColor="#1976d2" onPress={onDetail}>
-            Detail
-          </Button>
-        )}
-      />
-    </Card>
-  )
-);
+const AccessItem = memo(({ item, onDetail }: any) => (
+  <Card
+    style={{
+      backgroundColor: "#fff",
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: "#eee",
+      marginHorizontal: 12,
+      marginBottom: 12,
+    }}
+  >
+    <List.Item
+      title={`${item.user_name} (${item.user_id})`}
+      description={`Outlet: ${item.outlet_name}\nRoles: ${item.roles.join(", ")}`}
+      right={() => (
+        <Button textColor="#1976d2" onPress={onDetail}>
+          Detail
+        </Button>
+      )}
+    />
+  </Card>
+));
 
-export default function MitraListScreen() {
+export default function AccessListScreen() {
   const router = useRouter();
 
-  const [mitra, setMitra] = useState<any[]>([]);
+  const [items, setItems] = useState<any[]>([]);
   const [search, setSearch] = useState("");
   const [cursor, setCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -73,15 +71,14 @@ export default function MitraListScreen() {
       setLoading(true);
 
       try {
-        const result = await getMitraList(
+        const result = await getAccessList(
           search.trim() || null,
           reset ? null : cursor,
-          10,
-          "semua"
+          10
         );
 
         if (result.success) {
-          setMitra((prev) => {
+          setItems((prev) => {
             const merged = reset
               ? result.data
               : [...prev, ...result.data];
@@ -96,8 +93,8 @@ export default function MitraListScreen() {
           setCursor(result.nextCursor ?? null);
           setHasMore(!!result.nextCursor);
         }
-      } catch (err) {
-        console.error("🔥 Error fetch mitra:", err);
+      } catch (e) {
+        console.error("🔥 getAccessList:", e);
       } finally {
         fetchLock.current = false;
         setLoading(false);
@@ -106,6 +103,7 @@ export default function MitraListScreen() {
     [search, cursor]
   );
 
+  // initial load
   useEffect(() => {
     if (didInitialLoad.current) return;
     didInitialLoad.current = true;
@@ -117,6 +115,7 @@ export default function MitraListScreen() {
     });
   }, []);
 
+  // debounce search
   useEffect(() => {
     if (!didInitialLoad.current) return;
 
@@ -150,9 +149,9 @@ export default function MitraListScreen() {
 
   const renderItem = useCallback(
     ({ item }: any) => (
-      <MitraItem
+      <AccessItem
         item={item}
-        onDetail={() => router.push(`/karyawan/${item.id}`)}
+        onDetail={() => router.push(`/access/${item.id}`)}
       />
     ),
     []
@@ -160,27 +159,20 @@ export default function MitraListScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: "#f9f9f9" }}>
-      <AppHeaderList
-        title="Data Mitra"
-        onAdd={() => router.push("/karyawan/add")}
-      />
+      <AppHeaderList title="Akses User" onAdd={() => router.push("/access/add")} />
 
       <AppSearchBarBottomSheet
         value={search}
         onChangeText={setSearch}
         mode="semua"
         onChangeMode={() => {}}
-        placeholder="Cari nama / telp..."
-        categories={[
-          { label: "Semua", value: "semua" },
-          { label: "Nama", value: "nama" },
-          { label: "Telepon", value: "telp" },
-        ]}
+        placeholder="Cari user / outlet / role..."
+        categories={[{ label: "Semua", value: "semua" }]}
         defaultMode="semua"
       />
 
       <FlatList
-        data={mitra}
+        data={items}
         keyExtractor={(i) => i.id}
         renderItem={renderItem}
         refreshControl={
@@ -193,13 +185,19 @@ export default function MitraListScreen() {
         }}
         ListEmptyComponent={
           !loading && (
-            <Text style={{ textAlign: "center", marginTop: 20 }}>
-              Belum ada data mitra.
+            <Text
+              style={{
+                textAlign: "center",
+                marginTop: 20,
+                color: "#777",
+              }}
+            >
+              Belum ada akses user
             </Text>
           )
         }
         ListFooterComponent={
-          loading && mitra.length > 0 ? (
+          loading && items.length > 0 ? (
             <ActivityIndicator style={{ marginVertical: 20 }} />
           ) : null
         }

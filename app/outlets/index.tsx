@@ -20,13 +20,16 @@ import {
 } from "react-native-paper";
 import { useRouter } from "expo-router";
 
-import { getMitraList } from "../../services/api/mitraService";
+import { getOutletList } from "../../services/api/outletsService";
+
 import AppHeaderList from "../../components/ui/AppHeaderList";
 import AppSearchBarBottomSheet from "../../components/ui/AppSearchBarBottomSheet";
 
-/* ITEM */
-const MitraItem = memo(
-  ({ item, onDetail }: any) => (
+/* ============================================================
+   ITEM CARD COMPONENT
+============================================================ */
+const OutletItem = memo(
+  ({ item, onDetail }: { item: any; onDetail: () => void }) => (
     <Card
       style={{
         backgroundColor: "#fff",
@@ -38,8 +41,8 @@ const MitraItem = memo(
       }}
     >
       <List.Item
-        title={item.nama}
-        description={`Alamat: ${item.alamat}\nTelp: ${item.telp}`}
+        title={item.name}
+        description={`Alamat: ${item.address}\nTelp: ${item.phone}`}
         right={() => (
           <Button textColor="#1976d2" onPress={onDetail}>
             Detail
@@ -50,42 +53,50 @@ const MitraItem = memo(
   )
 );
 
-export default function MitraListScreen() {
+/* ============================================================
+   LIST SCREEN
+============================================================ */
+export default function OutletListScreen() {
   const router = useRouter();
 
-  const [mitra, setMitra] = useState<any[]>([]);
+  const [outlets, setOutlets] = useState<any[]>([]);
   const [search, setSearch] = useState("");
   const [cursor, setCursor] = useState<string | null>(null);
+
+  const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [hasMore, setHasMore] = useState(true);
 
+  // Prevent duplicate executes
   const didInitialLoad = useRef(false);
   const fetchLock = useRef(false);
   const endReachedLock = useRef(true);
   const debounceTimer = useRef<NodeJS.Timeout | null>(null);
 
+  /* ============================================================
+     SAFE FETCH — API DIPANGGIL DENGAN LOCK
+  ============================================================ */
   const safeFetch = useCallback(
     async (reset = false) => {
-      if (fetchLock.current) return;
+      if (fetchLock.current) return; // prevent parallel calls
 
       fetchLock.current = true;
       setLoading(true);
 
       try {
-        const result = await getMitraList(
+        const result = await getOutletList(
           search.trim() || null,
           reset ? null : cursor,
-          10,
-          "semua"
+          10
         );
 
         if (result.success) {
-          setMitra((prev) => {
+          setOutlets((prev) => {
             const merged = reset
               ? result.data
               : [...prev, ...result.data];
 
+            // remove duplicates by id
             const unique = Array.from(
               new Map(merged.map((i) => [i.id, i])).values()
             );
@@ -97,7 +108,7 @@ export default function MitraListScreen() {
           setHasMore(!!result.nextCursor);
         }
       } catch (err) {
-        console.error("🔥 Error fetch mitra:", err);
+        console.error("🔥 Error fetch outlets:", err);
       } finally {
         fetchLock.current = false;
         setLoading(false);
@@ -106,6 +117,9 @@ export default function MitraListScreen() {
     [search, cursor]
   );
 
+  /* ============================================================
+     INITIAL LOAD — hanya 1x (strict-mode safe)
+  ============================================================ */
   useEffect(() => {
     if (didInitialLoad.current) return;
     didInitialLoad.current = true;
@@ -117,12 +131,16 @@ export default function MitraListScreen() {
     });
   }, []);
 
+  /* ============================================================
+     SEARCH DEBOUNCE — skip initial, skip empty search
+  ============================================================ */
   useEffect(() => {
     if (!didInitialLoad.current) return;
 
     if (debounceTimer.current)
       clearTimeout(debounceTimer.current);
 
+    // EMPTY SEARCH → reload list
     if (search.trim() === "") {
       setCursor(null);
       safeFetch(true);
@@ -135,9 +153,13 @@ export default function MitraListScreen() {
     }, 500);
   }, [search]);
 
+  /* ============================================================
+     REFRESH — safe, single API call
+  ============================================================ */
   const onRefresh = async () => {
     setRefreshing(true);
-    endReachedLock.current = true;
+
+    endReachedLock.current = true; // block auto load
     setCursor(null);
 
     await safeFetch(true);
@@ -148,40 +170,43 @@ export default function MitraListScreen() {
     }, 300);
   };
 
+  /* ============================================================
+     RENDER ITEM
+  ============================================================ */
   const renderItem = useCallback(
     ({ item }: any) => (
-      <MitraItem
+      <OutletItem
         item={item}
-        onDetail={() => router.push(`/karyawan/${item.id}`)}
+        onDetail={() => router.push(`/outlets/${item.id}`)}
       />
     ),
     []
   );
 
+  /* ============================================================
+     MAIN UI
+  ============================================================ */
   return (
     <View style={{ flex: 1, backgroundColor: "#f9f9f9" }}>
       <AppHeaderList
-        title="Data Mitra"
-        onAdd={() => router.push("/karyawan/add")}
+        title="Daftar Outlet"
+        onAdd={() => router.push("/outlets/add")}
       />
 
+      {/* Search bar */}
       <AppSearchBarBottomSheet
         value={search}
         onChangeText={setSearch}
         mode="semua"
         onChangeMode={() => {}}
-        placeholder="Cari nama / telp..."
-        categories={[
-          { label: "Semua", value: "semua" },
-          { label: "Nama", value: "nama" },
-          { label: "Telepon", value: "telp" },
-        ]}
+        placeholder="Cari outlet..."
+        categories={[{ label: "Semua", value: "semua" }]}
         defaultMode="semua"
       />
 
       <FlatList
-        data={mitra}
-        keyExtractor={(i) => i.id}
+        data={outlets}
+        keyExtractor={(item) => item.id}
         renderItem={renderItem}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
@@ -193,13 +218,19 @@ export default function MitraListScreen() {
         }}
         ListEmptyComponent={
           !loading && (
-            <Text style={{ textAlign: "center", marginTop: 20 }}>
-              Belum ada data mitra.
+            <Text
+              style={{
+                textAlign: "center",
+                color: "#777",
+                marginTop: 20,
+              }}
+            >
+              Belum ada data outlet
             </Text>
           )
         }
         ListFooterComponent={
-          loading && mitra.length > 0 ? (
+          loading && outlets.length > 0 ? (
             <ActivityIndicator style={{ marginVertical: 20 }} />
           ) : null
         }
