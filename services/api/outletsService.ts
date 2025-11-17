@@ -71,7 +71,7 @@ export const getOutletListLite = async (ownerId: string) => {
     params.append("owner_id", ownerId);
 
     const res = await api.get(`/getOutletListLite?${params.toString()}`);
-    return res.data.data; // array: [{id, name}]
+    return res.data; // array: [{id, name}]
   } catch (err) {
     console.error("❌ getOutletListLite error:", err);
     return [];

@@ -24,29 +24,57 @@ import { getAccessList } from "../../services/api/accessService";
 import AppHeaderList from "../../components/ui/AppHeaderList";
 import AppSearchBarBottomSheet from "../../components/ui/AppSearchBarBottomSheet";
 
+
+
 /* ITEM */
-const AccessItem = memo(({ item, onDetail }: any) => (
-  <Card
-    style={{
-      backgroundColor: "#fff",
-      borderRadius: 10,
-      borderWidth: 1,
-      borderColor: "#eee",
-      marginHorizontal: 12,
-      marginBottom: 12,
-    }}
-  >
-    <List.Item
-      title={`${item.user_name} (${item.user_id})`}
-      description={`Outlet: ${item.outlet_name}\nRoles: ${item.roles.join(", ")}`}
-      right={() => (
-        <Button textColor="#1976d2" onPress={onDetail}>
-          Detail
-        </Button>
-      )}
-    />
-  </Card>
-));
+const AccessItem = memo(({ item, onDetail }: any) => {
+  // Generate outlet name list
+  const outletNames = Array.isArray(item.outlets)
+    ? item.outlets
+        .map((o: any) => (o && o.name ? o.name : null))
+        .filter(Boolean)
+        .join(", ")
+    : "-";
+
+  return (
+    
+    <Card
+      style={{
+        backgroundColor: "#fff",
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: "#eee",
+        marginHorizontal: 12,
+        marginBottom: 12,
+      }}
+    >
+      <List.Item
+  title={`${item.user?.name ?? "(tanpa nama)"} (${item.user_id})`}
+  description={
+    `Phone: ${item.user?.phone ?? "-"}\n` +
+    `Outlet: ${outletNames}\n` +
+    `Roles: ${Array.isArray(item.roles) ? item.roles.join(", ") : "-"}`
+  }
+  descriptionNumberOfLines={5}
+  descriptionStyle={{
+    whiteSpace: "pre-line",   // ⭐ penting untuk Web agar \n dianggap sebagai newline
+    marginTop: 4,
+    fontSize: 14,
+    color: "#555",
+  }}
+  right={() => (
+    <Button textColor="#1976d2" onPress={onDetail}>
+      Detail
+    </Button>
+  )}
+/>
+
+
+    </Card>
+   
+  );
+  
+});
 
 export default function AccessListScreen() {
   const router = useRouter();
@@ -79,9 +107,10 @@ export default function AccessListScreen() {
 
         if (result.success) {
           setItems((prev) => {
-            const merged = reset
-              ? result.data
-              : [...prev, ...result.data];
+            const merged = [
+          ...prev.filter((x) => !result.data.some((y) => y.id === x.id)),
+          ...result.data,
+          ];
 
             const unique = Array.from(
               new Map(merged.map((i) => [i.id, i])).values()
@@ -102,6 +131,8 @@ export default function AccessListScreen() {
     },
     [search, cursor]
   );
+
+
 
   // initial load
   useEffect(() => {
@@ -155,7 +186,9 @@ export default function AccessListScreen() {
       />
     ),
     []
+    
   );
+
 
   return (
     <View style={{ flex: 1, backgroundColor: "#f9f9f9" }}>

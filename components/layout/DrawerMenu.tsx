@@ -36,11 +36,19 @@ const MENU_JSON: MenuItem[] = [
     children: [
       { key: "outlet", label: "Outlet", icon: "store", path: "outlets" },
       { key: "group", label: "Group", icon: "account-group-outline", path: "groups" },
-      { key: "owner", label: "Owner", icon: "account-group-outline", path: "owners" },
+      {
+        key: "owner",
+        label: "Owner",
+        icon: "account-group",
+        children: [
+          { key: "owner_list", label: "Daftar Owner", icon: "account-group-outline", path: "owners" },
+          { key: "owner_register", label: "Registrasi Owner", icon: "account-plus", path: "auth/register-owner" },
+        ]
+      },
       { key: "role", label: "Role", icon: "account-group-outline", path: "roles" },
       { key: "page_admin", label: "Akses Admin", icon: "account-group-outline", path: "pages_admin" },
       { key: "page_operational", label: "Akses operasional", icon: "account-group-outline", path: "pages_operational" },
-       { key: "access", label: "akses", icon: "account-group-outline", path: "access" },
+       { key: "access", label: "Akses", icon: "account-group-outline", path: "access" },
       {
         key: "advanced",
         label: "Advanced",

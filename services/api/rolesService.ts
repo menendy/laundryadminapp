@@ -49,10 +49,13 @@ export const addRole = async (payload: RolePayload) => {
 /* ------------------------------------------
    ROLE LIST LITE (dropdown)
 -------------------------------------------*/
-export const getRoleListLite = async () => {
+export const getRoleListLite = async (ownerId: string) => {
   try {
-    const res = await api.get("/getRoleListLite");
-    return res.data.data; // array: [{id, name}]
+    const params = new URLSearchParams();
+    params.append("owner_id", ownerId);
+
+    const res = await api.get(`/getRoleListLite?${params.toString()}`);
+    return res.data; // array: [{id, name}]
   } catch (err) {
     console.error("❌ getRoleListLite error:", err);
     return [];

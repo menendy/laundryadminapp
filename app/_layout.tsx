@@ -14,7 +14,7 @@ import { useSnackbarStore } from "../store/useSnackbarStore";
 // ✅ Tema global react-native-paper
 const theme = {
   ...DefaultTheme,
-  roundness: 0,
+  roundness: 10,
   colors: {
     ...DefaultTheme.colors,
     primary: "#1976d2", // warna biru utama

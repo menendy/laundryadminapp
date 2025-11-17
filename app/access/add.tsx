@@ -4,7 +4,6 @@ import { Button, Text } from "react-native-paper";
 import { useRouter } from "expo-router";
 
 import AppHeaderActions from "../../components/ui/AppHeaderActions";
-import ValidatedInput from "../../components/ui/ValidatedInput";
 import { useSnackbarStore } from "../../store/useSnackbarStore";
 
 import { getUsersLite } from "../../services/api/usersService";
@@ -15,61 +14,70 @@ import { getRoleListLite } from "../../services/api/rolesService";
 
 import { addAccess } from "../../services/api/accessService";
 
-import DropDownPicker from "react-native-dropdown-picker";
+import AppAutocomplete from "../../components/ui/AppAutocomplete";
+import AppMultiSelect from "../../components/ui/AppMultiSelect";
 
 export default function AddAccessScreen() {
   const router = useRouter();
   const showSnackbar = useSnackbarStore((s) => s.showSnackbar);
 
-  // ------------ FORM STATE ------------
+  // --- VALUE STATES ---
   const [userId, setUserId] = useState("");
   const [ownerId, setOwnerId] = useState("");
   const [groupId, setGroupId] = useState("");
-  const [outletId, setOutletId] = useState("");
+  //const [outletId, setOutletId] = useState("");
+  const [outletIds, setOutletId] = useState<string[]>([]);
   const [roles, setRoles] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
+
   const [errors, setErrors] = useState<any>({});
 
-  // ------------ DROPDOWN DATA ------------
+  // --- DATA LIST ---
   const [users, setUsers] = useState<any[]>([]);
   const [owners, setOwners] = useState<any[]>([]);
   const [groups, setGroups] = useState<any[]>([]);
   const [outlets, setOutlets] = useState<any[]>([]);
   const [rolesList, setRolesList] = useState<any[]>([]);
 
-  // ------------ FETCH STATIC DROPDOWN ------------
+  // --- FETCH STATIC LIST ---
   useEffect(() => {
     getUsersLite().then((r) => r.success && setUsers(r.data));
     getOwnerListLite().then((r) => r.success && setOwners(r.data));
-    getRoleListLite().then((r) => r.success && setRolesList(r.data));
+    //getRoleListLite().then((r) => r.success && setRolesList(r.data));
   }, []);
 
-  // ------------ FETCH GROUPS WHEN OWNER CHANGES ------------
+  // --- FETCH OUTLETS ---
   useEffect(() => {
-    if (ownerId)
-      getGroupListLite(ownerId).then((r) => r.success && setGroups(r.data));
-    else {
-      setGroups([]);
-      setGroupId("");
-    }
-  }, [ownerId]);
-
-  // ------------ FETCH OUTLETS ------------
-  useEffect(() => {
-    if (ownerId)
-      getOutletListLite(ownerId, groupId).then((r) => r.success && setOutlets(r.data));
-    else {
+    if (ownerId) {
+      getOutletListLite(ownerId).then((r) => {
+        if (r.success) {
+          console.log("📌 OUTLET API DATA:", r.data);
+          setOutlets(r.data);
+        }
+      });
+    } else {
       setOutlets([]);
       setOutletId("");
     }
-  }, [ownerId, groupId]);
+  }, [ownerId]);
 
-  // ------------ VALIDATION ------------
+  // --- FETCH ROLES BY OWNER ---
+  useEffect(() => {
+    if (ownerId) {
+      getRoleListLite(ownerId).then((r) => r.success && setRolesList(r.data));
+    } else {
+      setRoles([]);
+      //setGroupId("");
+    }
+  }, [ownerId]);
+
+  // --- VALIDATION ---
   const validate = () => {
     const e: any = {};
     if (!userId) e.userId = "Wajib dipilih";
     if (!ownerId) e.ownerId = "Wajib dipilih";
-    if (!outletId) e.outletId = "Wajib dipilih";
+    //if (!outletId) e.outletId = "Wajib dipilih";
+    if (outletIds.length === 0) e.outletIds = "Minimal pilih 1 outlet";
     if (roles.length === 0) e.roles = "Minimal 1 role";
 
     setErrors(e);
@@ -89,12 +97,14 @@ export default function AddAccessScreen() {
         user_id: userId,
         owner_id: ownerId,
         group_id: groupId || null,
-        outlet_id: outletId,
+        //outlet_id: outletId,
+        outlet_id: outletIds,
         roles,
       };
 
-      const result = await addAccess(payload);
+      console.log("📌 PAYLOAD:", payload);
 
+      const result = await addAccess(payload);
       if (!result.success) {
         showSnackbar(result.message || "Gagal menambah akses", "error");
         return;
@@ -102,13 +112,12 @@ export default function AddAccessScreen() {
 
       showSnackbar("Akses berhasil ditambahkan", "success");
       router.back();
-    } catch (e) {
-      console.error("🔥 addAccess:", e);
-      showSnackbar("Error koneksi server", "error");
     } finally {
       setLoading(false);
     }
   };
+
+  
 
   return (
     <View style={{ flex: 1, backgroundColor: "#f9f9f9" }}>
@@ -116,61 +125,70 @@ export default function AddAccessScreen() {
 
       <ScrollView contentContainerStyle={{ padding: 20 }}>
         {/* USER */}
-        <Text style={{ fontWeight: "600", marginBottom: 6 }}>User</Text>
-        <DropDownPicker
-          open={false}
-          value={userId}
-          items={users.map((u) => ({ label: u.name, value: u.id }))}
+        <AppAutocomplete
+          label="User"
           placeholder="Pilih user"
-          setValue={(v) => setUserId(v())}
+          value={userId}
+          onChange={(val) => {
+            //console.log("📌 USER SELECTED:", val);
+            setUserId(val);
+          }}
+          items={users.map((u) => ({ label: u.name, value: u.id }))}
         />
         {errors.userId && <Text style={{ color: "red" }}>{errors.userId}</Text>}
 
         {/* OWNER */}
-        <Text style={{ fontWeight: "600", marginTop: 20, marginBottom: 6 }}>Owner</Text>
-        <DropDownPicker
-          open={false}
-          value={ownerId}
-          items={owners.map((o) => ({ label: o.name, value: o.id }))}
+        <AppAutocomplete
+          label="Owner"
           placeholder="Pilih owner"
-          setValue={(v) => setOwnerId(v())}
+          value={ownerId}
+          onChange={(val) => {
+            //console.log("📌 OWNER SELECTED:", val);
+            setOwnerId(val);
+          }}
+          items={owners.map((o) => ({ label: o.name, value: o.id }))}
         />
         {errors.ownerId && <Text style={{ color: "red" }}>{errors.ownerId}</Text>}
 
         {/* GROUP */}
         {groups.length > 0 && (
-          <>
-            <Text style={{ fontWeight: "600", marginTop: 20, marginBottom: 6 }}>Group (opsional)</Text>
-            <DropDownPicker
-              open={false}
-              value={groupId}
-              items={groups.map((g) => ({ label: g.name, value: g.id }))}
-              placeholder="Pilih group"
-              setValue={(v) => setGroupId(v())}
-            />
-          </>
+          <AppAutocomplete
+            label="Group (opsional)"
+            placeholder="Pilih group"
+            value={groupId}
+            onChange={(val) => {
+              //console.log("📌 GROUP SELECTED:", val);
+              setGroupId(val);
+            }}
+            items={groups.map((g) => ({ label: g.name, value: g.id }))}
+          />
         )}
 
         {/* OUTLET */}
-        <Text style={{ fontWeight: "600", marginTop: 20, marginBottom: 6 }}>Outlet</Text>
-        <DropDownPicker
-          open={false}
-          value={outletId}
-          items={outlets.map((o) => ({ label: o.name, value: o.id }))}
-          placeholder="Pilih outlet"
-          setValue={(v) => setOutletId(v())}
-        />
-        {errors.outletId && <Text style={{ color: "red" }}>{errors.outletId}</Text>}
+       <AppMultiSelect
+   label="Outlet"
+   placeholder="Pilih outlet"
+   value={outletIds}
+   onChange={(val) => {
+     console.log("📌 OUTLET SELECTED:", val);
+     setOutletId(val);
+   }}
+   items={outlets.map((o) => ({ label: o.name, value: o.id }))}
+ />
+ {errors.outletIds && (
+   <Text style={{ color: "red" }}>{errors.outletIds}</Text>
+ )}
 
         {/* ROLES */}
-        <Text style={{ fontWeight: "600", marginTop: 20, marginBottom: 6 }}>Roles</Text>
-        <DropDownPicker
-          multiple
-          open={false}
-          value={roles}
-          items={rolesList.map((r) => ({ label: r.name, value: r.id }))}
+        <AppMultiSelect
+          label="Roles"
           placeholder="Pilih roles"
-          setValue={(v) => setRoles(v())}
+          value={roles}
+          onChange={(val) => {
+            console.log("📌 ROLES SELECTED:", val);
+            setRoles(val);
+          }}
+          items={rolesList.map((r) => ({ label: r.name, value: r.id }))}
         />
         {errors.roles && <Text style={{ color: "red" }}>{errors.roles}</Text>}
 
