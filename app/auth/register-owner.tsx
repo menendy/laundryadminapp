@@ -7,6 +7,7 @@ import AppHeaderActions from "../../components/ui/AppHeaderActions";
 import ValidatedInput from "../../components/ui/ValidatedInput";
 import { useSnackbarStore } from "../../store/useSnackbarStore";
 import { registerOwner } from "../../services/api/authService";
+import { handleBackendError } from "../../utils/handleBackendError";
 
 export default function RegisterOwnerScreen() {
   const router = useRouter();
@@ -27,16 +28,13 @@ export default function RegisterOwnerScreen() {
 
     if (!name.trim()) e.name = "Nama wajib diisi";
     if (!phone.trim()) e.phone = "No HP wajib diisi";
-
     if (!email.trim()) e.email = "Email wajib diisi";
-    else if (!email.includes("@")) e.email = "Format email tidak valid";
 
     if (!password) e.password = "Password wajib diisi";
-    else if (password.length < 6)
-      e.password = "Minimal 6 karakter";
 
-    if (password !== confirm)
-      e.confirm = "Password tidak sama";
+
+    //if (password !== confirm)
+      //e.confirm = "Password tidak sama";
 
     setErrors(e);
 
@@ -45,31 +43,23 @@ export default function RegisterOwnerScreen() {
 
   const handleSubmit = async () => {
     if (!validate()) {
-      showSnackbar("Periksa kembali form Anda", "error");
+      showSnackbar("Periksa kembali isian form Anda", "error");
       return;
     }
 
     try {
-      setLoading(true);
-
-      const payload = { name, phone, email, password };
-
-      const res = await registerOwner(payload);
-
-      if (!res.success) {
-        showSnackbar(res.message || "Gagal register owner", "error");
-        return;
-      }
-
-      showSnackbar("Registrasi berhasil. Menunggu aktivasi admin.", "success");
-
-      //router.replace("/auth/login");
-    } catch (err) {
-      console.error("🔥 registerOwner:", err);
-      showSnackbar("Terjadi kesalahan server", "error");
-    } finally {
-      setLoading(false);
-    }
+       setLoading(true);
+            const result = await registerOwner({ name, phone, email, password, confirm });
+            const ok = handleBackendError(result, setErrors, showSnackbar);
+            if (!ok) return;
+            showSnackbar(`✅ ${result.message}`, "success");
+            router.back();
+          } catch (err) {
+            console.error("🔥 Error add mitra:", err);
+            showSnackbar("Terjadi kesalahan koneksi", "error");
+          } finally {
+            setLoading(false);
+          }
   };
 
   return (

@@ -27,6 +27,7 @@ type MenuItem = {
 // --- MENU JSON DI SINI --- //
 const MENU_JSON: MenuItem[] = [
   { key: "dashboard", label: "Dashboard", icon: "view-dashboard", path: "/" },
+  { key: "login", label: "login", icon: "view-dashboard", path: "auth/login" },
   { key: "profil", label: "Profil Akun", icon: "account-circle", path: "/profil" },
   { key: "karyawan", label: "Karyawan", icon: "account-group", path: "/karyawan" },
   {
@@ -43,6 +44,8 @@ const MENU_JSON: MenuItem[] = [
         children: [
           { key: "owner_list", label: "Daftar Owner", icon: "account-group-outline", path: "owners" },
           { key: "owner_register", label: "Registrasi Owner", icon: "account-plus", path: "auth/register-owner" },
+          { key: "owner_activation", label: "Aktivasi Owner", icon: "account-check-outline", path: "owners/aktivasi-owner"       // kamu bisa sesuaikan path
+     },
         ]
       },
       { key: "role", label: "Role", icon: "account-group-outline", path: "roles" },
@@ -89,7 +92,7 @@ export default function DrawerMenu({ onClose }: { onClose: () => void }) {
     Animated.timing(anim, {
       toValue: isOpen ? 1 : 0,
       duration: 200,
-      useNativeDriver: true,
+      useNativeDriver: false,
     }).start();
   };
 
@@ -155,23 +158,20 @@ export default function DrawerMenu({ onClose }: { onClose: () => void }) {
 
         {/* CHILDREN ANIMATED */}
         <Animated.View
-          style={{
-            overflow: "hidden",
-            opacity: anim,
-            transform: [
-              {
-                scaleY: anim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [0.8, 1],
-                }),
-              },
-            ],
-          }}
-        >
-          <View style={{ paddingLeft: 16 }}>
-            {item.children!.map((c) => renderItem(c, level + 1))}
-          </View>
-        </Animated.View>
+  style={{
+    overflow: "hidden",
+    maxHeight: anim.interpolate({
+      inputRange: [0, 1],
+      outputRange: [0, 500], // cukup besar untuk isi submenu kamu
+    }),
+    opacity: anim,
+  }}
+>
+  <View style={{ paddingLeft: 16 }}>
+    {item.children!.map((c) => renderItem(c, level + 1))}
+  </View>
+</Animated.View>
+
       </View>
     );
   }

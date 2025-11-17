@@ -1,5 +1,6 @@
 import axios from "axios";
 import { API_BASE_URL } from "../../constants/env";
+import { useAuthStore } from "../../store/useAuthStore"; // <-- pastikan sesuai lokasi
 
 /**
  * instance global Axios
@@ -13,10 +14,19 @@ export const api = axios.create({
 });
 
 /**
- * Logging interceptor (optional)
- * Menampilkan log setiap request yang dikirim
+ * Request Interceptor — Inject Bearer Token
  */
-api.interceptors.request.use((config) => {
+api.interceptors.request.use(async (config) => {
+  try {
+    const token = useAuthStore.getState().token; // ambil token dari Zustand store
+
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+  } catch (e) {
+    console.warn("⚠️ Cannot attach token:", e);
+  }
+
   console.log(
     `🚀 [${config.method?.toUpperCase()}] ${config.baseURL}${config.url}`
   );
@@ -24,17 +34,11 @@ api.interceptors.request.use((config) => {
 });
 
 /**
- * Response interceptor global
- * Semua error 4xx / 5xx dikonversi ke format seragam
- * Tidak ada throw/reject; semua dikembalikan via Promise.resolve
+ * Response Interceptor
  */
 api.interceptors.response.use(
-  // CASE 1: sukses (status 2xx)
-  (response) => {
-    return response;
-  },
+  (response) => response,
 
-  // CASE 2: gagal (status >= 400)
   (error) => {
     if (error.response) {
       const { status, data } = error.response;
@@ -44,30 +48,23 @@ api.interceptors.response.use(
         JSON.stringify(data)
       );
 
-      // Bentuk respons error agar seragam
-      const normalizedResponse = {
-        ...data,
-        status,
-        success: false,
-      };
-
-      // Kembalikan dalam Promise.resolve agar tidak dilempar ke catch
       return Promise.resolve({
-        data: normalizedResponse,
+        data: {
+          ...data,
+          status,
+          success: false,
+        },
       });
     }
 
-    // ❌ CASE 3: error koneksi / tidak ada respon sama sekali
     console.error("❌ API Connection Error:", error.message);
 
-    const fallbackResponse = {
+    return Promise.resolve({
       data: {
         success: false,
         status: 0,
         message: "Tidak dapat terhubung ke server",
       },
-    };
-
-    return Promise.resolve(fallbackResponse);
+    });
   }
 );
