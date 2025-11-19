@@ -1,36 +1,38 @@
-console.log("🔥 FILE loadUserAccess.ts LOADED");
 // services/auth/loadUserAccess.ts
-import { getAuth } from "firebase/auth";
+import { jwtDecode } from "jwt-decode";
 import { db } from "../firebase";
-import { useAuthStore } from "../../store/useAuthStore";
-import { useAccessStore } from "../../store/useAccessStore";
 import { doc, getDoc } from "firebase/firestore";
 
-/**
- * Membaca ulang custom claims, 
- * ambil roleIds, fetch roles dari Firestore,
- * lalu simpan ke Zustand.
- */
-export async function loadUserAccessFromClaims() {
-  const auth = getAuth();
-  const firebaseUser = auth.currentUser;
+import { useAuthStore } from "../../store/useAuthStore";
+import { useAccessStore } from "../../store/useAccessStore";
 
-  if (!firebaseUser) return;
+export async function loadUserAccessFromClaims(idToken: string) {
+  if (!idToken) {
+    console.log("❌ loadUserAccessFromClaims: empty token");
+    return;
+  }
 
-  // =========================================
-  // 1) Ambil custom claims
-  // =========================================
-  const tokenResult = await firebaseUser.getIdTokenResult(true);
-  const claims = tokenResult.claims || {};
-  const roleIds = Array.isArray(claims.role_ids) ? claims.role_ids as string[] : [];
+  // 1️⃣ Decode JWT
+  const decoded: any = jwtDecode(idToken);
 
-  console.log("Loaded role IDs from claims:", roleIds);
+  const roleIds: string[] = Array.isArray(decoded.role_ids) ? decoded.role_ids : [];
+  const activeTenant = decoded.active_tenant || null;
 
-  useAuthStore.getState().setRoleIds(roleIds);
+  //console.log("🔥 Claims roleIds:", roleIds);
+  console.log("🔥 Claims activeTenant:", activeTenant);
 
-  // =========================================
-  // 2) Fetch detail role dari Firestore
-  // =========================================
+  // 2️⃣ Simpan ke AuthStore
+  const authStore = useAuthStore.getState();
+  authStore.setRoleIds(roleIds);
+  authStore.setActiveTenant(activeTenant);
+
+  // Jika tidak ada role → clear access
+  if (!roleIds.length) {
+    useAccessStore.getState().setAccess([], {});
+    return;
+  }
+
+  // 3️⃣ Ambil detail role dari Firestore
   const pagesSet = new Set<string>();
   const permsByPage: Record<string, any> = {};
 
@@ -40,22 +42,20 @@ export async function loadUserAccessFromClaims() {
 
     const data = snap.data();
 
-    // Add pages
+    // pages[]
     (data.pages || []).forEach((p: string) => pagesSet.add(p));
 
-    // Merge permissions
+    // permissions{}
     if (data.permissions) {
-      Object.entries(data.permissions).forEach(([p, val]) => {
-        permsByPage[p] = { ...(permsByPage[p] || {}), ...(val as any) };
+      Object.entries(data.permissions).forEach(([page, val]) => {
+        permsByPage[page] = { ...(permsByPage[page] || {}), ...(val as any) };
       });
     }
   }
 
-  // =========================================
-  // 3) Simpan ke Zustand
-  // =========================================
-  useAccessStore.getState().setAccess(
-    Array.from(pagesSet),
-    permsByPage
-  );
+  // 4️⃣ Simpan hasil role-access ke Zustand
+  useAccessStore.getState().setAccess(Array.from(pagesSet), permsByPage);
+
+  //console.log("🔥 Loaded pages:", Array.from(pagesSet));
+  //console.log("🔥 Loaded permissions:", permsByPage);
 }

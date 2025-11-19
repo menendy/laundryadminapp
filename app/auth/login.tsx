@@ -1,16 +1,19 @@
+// app/auth/login.tsx
 import React, { useState } from "react";
-import { View,Platform  } from "react-native";
+import { View, Platform } from "react-native";
 import { TextInput, Button, Text } from "react-native-paper";
+
 import { loginUser } from "../../services/api/authService";
+import { loadUserAccessFromClaims } from "../../services/auth/loadUserAccess";
+
 import { useRouter } from "expo-router";
 import { useSnackbarStore } from "../../store/useSnackbarStore";
 import { useAuthStore } from "../../store/useAuthStore";
-import { loadUserAccessFromClaims } from "../../services/auth/loadUserAccess";
 
 
 export default function LoginScreen() {
   const router = useRouter();
-  const showSnackbar = useSnackbarStore(s => s.showSnackbar);
+  const showSnackbar = useSnackbarStore((s) => s.showSnackbar);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -24,6 +27,8 @@ export default function LoginScreen() {
 
     try {
       setLoading(true);
+
+      // 1️⃣ Login via Cloud Function
       const res = await loginUser({ email, password });
 
       if (!res.success) {
@@ -33,22 +38,29 @@ export default function LoginScreen() {
 
       showSnackbar("Login berhasil!", "success");
 
-      // simpan token (nanti kita buat store nya)
-      // tokenStore.set(res.token);
-      
-      const userData = res.user;      // dari API
-      const idToken = res.token;      // Firebase ID Token
+      // Ambil data kembali dari API
+      const idToken = res.token;            // Firebase ID TOKEN
+      const userData = res.user;
+      const activeTenant = res.active_tenant;
 
-      // ⬇⬇ SIMPAN di Zustand Store
-      useAuthStore.getState().login(userData, idToken);
+      // Simpan ke Auth Store
+      const authStore = useAuthStore.getState();
+      await authStore.login(userData, idToken);
 
-      // Khusus Web: simpan token ke sessionStorage
-      if (Platform.OS === "web") {
-        sessionStorage.setItem("auth-token", idToken);
-        sessionStorage.setItem("auth-user", JSON.stringify(userData));
+      // Simpan tenant
+      if (activeTenant) {
+        authStore.setActiveTenant(activeTenant);
       }
 
-      router.replace("/"); // pindah ke dashboard
+      // Load claims + role + permissions
+      await loadUserAccessFromClaims(idToken);
+
+      // Pindah ke dashboard
+      router.replace("/");
+
+    } catch (err) {
+      console.log("❌ ERROR:", err);
+      showSnackbar("Terjadi kesalahan saat login", "error");
 
     } finally {
       setLoading(false);
@@ -77,12 +89,7 @@ export default function LoginScreen() {
         style={{ marginBottom: 10 }}
       />
 
-      <Button
-        mode="contained"
-        onPress={handleLogin}
-        loading={loading}
-        disabled={loading}
-      >
+      <Button mode="contained" onPress={handleLogin} loading={loading}>
         Login
       </Button>
     </View>

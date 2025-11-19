@@ -1,26 +1,20 @@
+// store/useAccessStore.ts
 import { create } from "zustand";
 
-type AccessStore = {
-  allowedPages: string[];
-  permissionsByPage: Record<string, any>;
+export type AccessState = {
+  allowedPages: string[];             
+  permissions: Record<string, any>;   
 
   setAccess: (pages: string[], perms: Record<string, any>) => void;
-  clearAccess: () => void;
 };
 
-export const useAccessStore = create<AccessStore>((set) => ({
+export const useAccessStore = create<AccessState>((set) => ({
   allowedPages: [],
-  permissionsByPage: {},
+  permissions: {},
 
   setAccess: (pages, perms) =>
     set({
       allowedPages: pages,
-      permissionsByPage: perms,
-    }),
-
-  clearAccess: () =>
-    set({
-      allowedPages: [],
-      permissionsByPage: {},
+      permissions: perms,
     }),
 }));

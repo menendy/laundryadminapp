@@ -12,9 +12,13 @@ export interface MitraListResponse {
   nextCursor?: string | null;
   limit?: number;
   total?: number;
+  message?: string;
+  status?: number;
 }
 
 export const getMitraList = async (
+  modul: string,                   
+  pagePath: string,                    
   search: string | null = null,
   cursor: string | null = null,
   limit = 10,
@@ -22,18 +26,31 @@ export const getMitraList = async (
 ): Promise<MitraListResponse> => {
   try {
     const params = new URLSearchParams();
+
+    params.append("modul", modul);
+    params.append("path", pagePath);
+
     if (search) params.append("search", search);
     if (cursor) params.append("cursor", cursor);
     params.append("limit", limit.toString());
     params.append("mode", mode);
 
     const res = await api.get(`/getMitraList?${params.toString()}`);
+
     return res.data;
+
   } catch (err: any) {
     console.error("❌ getMitraList error:", err);
-    return { success: false, data: [] };
+
+    return {
+      success: false,
+      data: [],
+      message: err?.response?.data?.message || "Gagal memuat data",
+      status: err?.response?.status || 500
+    };
   }
 };
+
 
 
 export interface MitraResponse {

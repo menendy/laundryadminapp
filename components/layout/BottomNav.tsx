@@ -146,17 +146,17 @@ export default function BottomNav({ onMenuPress, onMenuClose, isDrawerOpen }) {
       >
         <TouchableOpacity
           style={{ alignItems: "center" }}
-          onPress={() => navigateAndMaybeClose("/outlet")}
+          onPress={() => navigateAndMaybeClose("/outlets")}
         >
           <MaterialIcons
             name="store"
             size={24}
-            color={pathname.startsWith("/outlet") ? "#007bff" : "#666"}
+            color={pathname.startsWith("/outlets") ? "#007bff" : "#666"}
           />
           <Text
             style={{
               fontSize: 12,
-              color: pathname.startsWith("/outlet") ? "#007bff" : "#666",
+              color: pathname.startsWith("/outlets") ? "#007bff" : "#666",
             }}
           >
             Outlet
