@@ -5,6 +5,8 @@ import { loginUser } from "../../services/api/authService";
 import { useRouter } from "expo-router";
 import { useSnackbarStore } from "../../store/useSnackbarStore";
 import { useAuthStore } from "../../store/useAuthStore";
+import { loadUserAccessFromClaims } from "../../services/auth/loadUserAccess";
+
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -45,7 +47,6 @@ export default function LoginScreen() {
         sessionStorage.setItem("auth-token", idToken);
         sessionStorage.setItem("auth-user", JSON.stringify(userData));
       }
-
 
       router.replace("/"); // pindah ke dashboard
 
