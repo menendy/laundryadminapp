@@ -4,6 +4,8 @@ import { Text } from "react-native-paper";
 import SafeAreaContainer from "../components/layout/SafeAreaContainer";
 import InfoCard from "../components/ui/InfoCard";
 
+
+
 export default function Dashboard() {
   return (
     <SafeAreaContainer>

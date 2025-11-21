@@ -41,7 +41,8 @@ const MitraItem = memo(({ item, onDetail }: any) => (
 
 export default function MitraListScreen() {
   const router = useRouter();
-  const pathname = usePathname() ?? "/karyawan";
+  //const pathname = usePathname() ?? "/karyawan";
+  const pathname = usePathname();;
   const modul = "Karyawan"; // tetap hardcoded seperti permintaan
 
   const showSnackbar = useSnackbarStore((s) => s.showSnackbar);

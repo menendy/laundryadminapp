@@ -46,6 +46,22 @@ export const addRole = async (payload: RolePayload) => {
   return res.data;
 };
 
+export interface RoleTypesResponse {
+  success: boolean;
+  data: { id: string; label: string }[];
+}
+
+
+export const getRoleTypes = async(): Promise<RoleTypesResponse> => {
+  try {
+    const res = await api.get("/getRolesType");
+    return res.data; // expect array of {id, label}
+  } catch (err) {
+    console.error("❌ getRoleType error:", err);
+    return { success: false, data: [] };
+  }
+}
+
 /* ------------------------------------------
    ROLE LIST LITE (dropdown)
 -------------------------------------------*/

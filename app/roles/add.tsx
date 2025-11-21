@@ -5,9 +5,12 @@ import { useRouter } from "expo-router";
 
 import AppHeaderActions from "../../components/ui/AppHeaderActions";
 import ValidatedInput from "../../components/ui/ValidatedInput";
-import { addRole } from "../../services/api/rolesService";
+import { addRole, getRoleTypes } from "../../services/api/rolesService";
 import { useSnackbarStore } from "../../store/useSnackbarStore";
 import { handleBackendError } from "../../utils/handleBackendError";
+import { fetchRoleTypes } from "../../services/firestore/rolesTypeService";
+import { Picker } from "@react-native-picker/picker";
+
 
 export default function AddRoleScreen() {
   const router = useRouter();
@@ -17,7 +20,9 @@ export default function AddRoleScreen() {
   const [name, setName] = useState("");
   const [desc, setDesc] = useState("");
 
-  const [type, setType] = useState<"system" | "operational">("system");
+  const [type, setType] = React.useState("");
+const [selectedLabel, setSelectedLabel] = React.useState("");
+const [typeOptions, setTypeOptions] = React.useState<{ id: string; label: string }[]>([]);
 
   const [appAccess, setAppAccess] = useState<string[]>([]);
 
@@ -30,7 +35,9 @@ export default function AddRoleScreen() {
     );
   };
 
-  const validate = () => {
+  
+
+    const validate = () => {
     const e: any = {};
 
     if (!ownerId.trim()) e.ownerId = "Owner wajib diisi";
@@ -72,6 +79,15 @@ export default function AddRoleScreen() {
     }
   };
 
+ React.useEffect(() => {
+  getRoleTypes().then((res) => {
+    if (res.success) {
+      setTypeOptions(res.data);
+    }
+  });
+}, []);
+
+ 
   return (
     <View style={{ flex: 1, backgroundColor: "#f9f9f9" }}>
       <AppHeaderActions title="Tambah Role" showBack />
@@ -108,21 +124,28 @@ export default function AddRoleScreen() {
           Tipe Role
         </Text>
 
-        <View style={{ flexDirection: "row", gap: 10 }}>
-          <Chip
-            selected={type === "system"}
-            onPress={() => setType("system")}
-          >
-            System
-          </Chip>
+       <View style={{ flexDirection: "row", alignItems: "center" }}>
+  <View style={{ flex: 1 }}>
+    <Picker
+      selectedValue={type}
+      onValueChange={(value) => {
+        setType(value);
+        const item = typeOptions.find((i) => i.id === value);
+        setSelectedLabel(item?.label ?? "");
+      }}
+    >
+      <Picker.Item label="Pilih Type" value="" />
+      {typeOptions.map((item) => (
+        <Picker.Item key={item.id} label={item.id} value={item.id} />
+      ))}
+    </Picker>
+  </View>
 
-          <Chip
-            selected={type === "operational"}
-            onPress={() => setType("operational")}
-          >
-            Operational
-          </Chip>
-        </View>
+  <View style={{ flex: 2, marginLeft: 10 }}>
+    <Text>{selectedLabel}</Text>
+  </View>
+</View>
+
 
         <Text
           style={{

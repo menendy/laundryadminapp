@@ -4,13 +4,21 @@ import { Text, Avatar, Button } from "react-native-paper";
 import { useAuthStore } from "../../store/useAuthStore";
 import { useRouter } from "expo-router";
 
+import { auth } from "../../services/firebase"; // unified
+
 export default function ProfilAkun() {
-  const logout = useAuthStore((s) => s.logout);
+  const logoutStore = useAuthStore((s) => s.logout);
   const router = useRouter();
 
   const handleLogout = async () => {
-    await logout();
-    router.replace("/auth/login");
+    try {
+      await auth.signOut();
+
+      await logoutStore();
+      router.replace("/auth/login");
+    } catch (err) {
+      console.error("Logout error:", err);
+    }
   };
 
   return (
@@ -23,11 +31,7 @@ export default function ProfilAkun() {
 
       <Text variant="bodyMedium">admin@laundryinn.com</Text>
 
-      <Button
-        mode="contained"
-        style={{ marginTop: 20 }}
-        onPress={handleLogout}
-      >
+      <Button mode="contained" style={{ marginTop: 20 }} onPress={handleLogout}>
         Logout
       </Button>
     </View>

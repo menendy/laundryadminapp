@@ -1,67 +1,63 @@
-// store/useAuthStore.ts
 import { create } from "zustand";
-import { Storage } from "./storage";
+import { persist, createJSONStorage } from "zustand/middleware";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Platform } from "react-native";
 
-export type ActiveTenant = {
-  owner_id: string;
-  outlet_id: string;
-  role: string;
-};
-
-export type AuthUser = {
-  uid: string;
-  email: string;
-  name?: string;
-  [key: string]: any;
-};
-
-export type AuthState = {
-  token: string | null;
-  user: AuthUser | null;
-  roleIds: string[];
-  activeTenant: ActiveTenant | null;
+interface AuthState {
+  user: any | null;
+  activeTenant: string | null;
   isHydrated: boolean;
 
-  hydrate: () => Promise<void>;
-  login: (user: AuthUser, token: string) => Promise<void>;
-  logout: () => Promise<void>;
+  login: (user: any, tenant: string) => void;
+  logout: () => void;
+  hydrate: () => void;
+}
 
-  setRoleIds: (r: string[]) => void;
-  setUser: (u: AuthUser | null) => void;
-  setActiveTenant: (t: ActiveTenant | null) => void;
-};
+export const useAuthStore = create<AuthState>()(
+  persist(
+    (set, get) => ({
+      user: null,
+      activeTenant: null,
+      isHydrated: false,
 
-export const useAuthStore = create<AuthState>((set) => ({
-  token: null,
-  user: null,
-  roleIds: [],
-  activeTenant: null,
-  isHydrated: false,
+      login: (user, tenant) =>
+        set({
+          user,
+          activeTenant: tenant,
+        }),
 
-  hydrate: async () => {
-    const token = await Storage.getItem("auth-token");
-    const userStr = await Storage.getItem("auth-user");
+      logout: () =>
+        set({
+          user: null,
+          activeTenant: null,
+        }),
 
-    set({
-      token,
-      user: userStr ? JSON.parse(userStr) : null,
-      isHydrated: true,
-    });
-  },
+      hydrate: () => set({ isHydrated: true }),
+    }),
 
-  login: async (user, token) => {
-    set({ user, token });
-    await Storage.setItem("auth-token", token);
-    await Storage.setItem("auth-user", JSON.stringify(user));
-  },
+    {
+      name: "auth-storage",
 
-  logout: async () => {
-    set({ user: null, token: null, roleIds: [], activeTenant: null });
-    await Storage.removeItem("auth-token");
-    await Storage.removeItem("auth-user");
-  },
+      // storage otomatis: web = localStorage, mobile = AsyncStorage
+      storage: createJSONStorage(() =>
+        Platform.OS === "web"
+          ? {
+              getItem: (key) => Promise.resolve(localStorage.getItem(key)),
+              setItem: (key, value) => {
+                localStorage.setItem(key, value);
+                return Promise.resolve();
+              },
+              removeItem: (key) => {
+                localStorage.removeItem(key);
+                return Promise.resolve();
+              },
+            }
+          : AsyncStorage
+      ),
 
-  setRoleIds: (roleIds) => set({ roleIds }),
-  setUser: (user) => set({ user }),
-  setActiveTenant: (activeTenant) => set({ activeTenant }),
-}));
+      onRehydrateStorage: () => (state) => {
+        if (state) state.isHydrated = true;
+      },
+    }
+  )
+);

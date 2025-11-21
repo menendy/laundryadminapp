@@ -19,6 +19,12 @@ export default {
     name: "laundryadminapp",
     slug: "laundryadminapp",
     version: "1.0.0",
+    plugins: [
+      "expo-secure-store",
+    ],
+    "android": {
+    "package": "com.anonymous.laundryadminapp"
+  },
     extra: {
       env: process.env.EXPO_PUBLIC_ENV,
       API_BASE_URL: process.env.EXPO_PUBLIC_API_BASE_URL,

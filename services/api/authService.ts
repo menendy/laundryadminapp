@@ -22,8 +22,8 @@ export const registerOwner = async (payload: RegisterOwnerPayload): Promise<Regi
   return res.data;
 };
 
-export const loginUser = async (payload: { email: string; password: string }) => {
+// services/api/authService.ts
+export const loginUser = async (payload: { uid: string }) => {
   const res = await api.post("/loginUser", payload);
   return res.data;
 };
-

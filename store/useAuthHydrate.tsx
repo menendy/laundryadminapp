@@ -5,7 +5,7 @@ export function AuthHydrate() {
   const hydrate = useAuthStore((s) => s.hydrate);
 
   useEffect(() => {
-    hydrate(); // HARUS DIPANGGIL
+    hydrate();
   }, []);
 
   return null;
