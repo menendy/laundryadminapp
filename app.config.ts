@@ -1,7 +1,6 @@
 import { config } from "dotenv";
 import path from "path";
 
-// Tentukan file .env berdasarkan argumen ENV
 const envType = process.env.EXPO_PUBLIC_ENV || "local";
 
 const envFile =
@@ -15,25 +14,33 @@ console.log(`🌱 Loading environment from: ${envFile}`);
 config({ path: path.resolve(__dirname, envFile) });
 
 export default {
-  expo: {
-    name: "laundryadminapp",
-    slug: "laundryadminapp",
-    version: "1.0.0",
-    plugins: [
-      "expo-secure-store",
-    ],
-    "android": {
-    "package": "com.anonymous.laundryadminapp"
+  name: "laundryadminapp",
+  slug: "laundryadminapp",
+  version: "1.0.0",
+  
+  plugins: [
+  
+    [
+      "@react-native-firebase/app",
+      {
+        android_google_services_file: "./google-services.json",
+      }
+    ]
+  ],
+
+  android: {
+    package: "com.anonymous.laundryadminapp",
+    googleServicesFile: "./google-services.json",
   },
-    extra: {
-      env: process.env.EXPO_PUBLIC_ENV,
-      API_BASE_URL: process.env.EXPO_PUBLIC_API_BASE_URL,
-      FIREBASE_API_KEY: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
-      FIREBASE_AUTH_DOMAIN: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
-      FIREBASE_PROJECT_ID: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID,
-      FIREBASE_STORAGE_BUCKET: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET,
-      FIREBASE_MESSAGING_SENDER_ID: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-      FIREBASE_APP_ID: process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
-    },
+
+  extra: {
+    env: process.env.EXPO_PUBLIC_ENV,
+    API_BASE_URL: process.env.EXPO_PUBLIC_API_BASE_URL,
+    FIREBASE_API_KEY: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
+    FIREBASE_AUTH_DOMAIN: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
+    FIREBASE_PROJECT_ID: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID,
+    FIREBASE_STORAGE_BUCKET: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET,
+    FIREBASE_MESSAGING_SENDER_ID: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+    FIREBASE_APP_ID: process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
   },
 };

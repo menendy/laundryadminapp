@@ -1,31 +1,31 @@
 import { Platform } from "react-native";
 
-// ======== MOBILE (React Native Firebase) =========
-let auth = null;
-let db = null;
+let auth: any = null;
+let db: any = null;
 
-if (Platform.OS !== "web") {
-  // Gunakan require agar hanya load di native
-  const rnfbAuth = require("@react-native-firebase/auth").default;
-  const rnfbFirestore = require("@react-native-firebase/firestore").default;
+export async function initFirebase() {
+  if (auth && db) return { auth, db }; // sudah diinisialisasi
 
-  // Tidak ada initializeApp manual untuk RNFB
-  // RNFirebase otomatis load default app dari google-services.json
+  if (Platform.OS !== "web") {
+    // Load native Firebase (React Native Firebase)
+    const rnfbAuth = require("@react-native-firebase/auth").default;
+    const rnfbFirestore = require("@react-native-firebase/firestore").default;
 
-  auth = rnfbAuth();          // instance default app
-  db = rnfbFirestore();
-}
+    auth = rnfbAuth();
+    db = rnfbFirestore();
+  } else {
+    // Load Firebase Web SDK
+    const { initializeApp } = await import("firebase/app");
+    const { getAuth } = await import("firebase/auth");
+    const { getFirestore } = await import("firebase/firestore");
+    const { firebaseConfig } = await import("./firebaseConfig");
 
-// ======== WEB (Firebase Web SDK) =========
-if (Platform.OS === "web") {
-  const { initializeApp } = require("firebase/app");
-  const { getAuth } = require("firebase/auth");
-  const { getFirestore } = require("firebase/firestore");
-  const { firebaseConfig } = require("./firebaseConfig");
+    const app = initializeApp(firebaseConfig);
+    auth = getAuth(app);
+    db = getFirestore(app);
+  }
 
-  const app = initializeApp(firebaseConfig);
-  auth = getAuth(app);
-  db = getFirestore(app);
+  return { auth, db };
 }
 
 export { auth, db };
