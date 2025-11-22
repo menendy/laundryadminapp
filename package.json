@@ -10,7 +10,6 @@
     "start:web": "expo start --web --port 8082",
     "start:mobile": "expo start --port 8081",
     "start:local": "cross-env EXPO_PUBLIC_ENV=local EXPO_PUBLIC_API_BASE_URL=http://localhost:5001/laundry-apps-7f84c/asia-southeast2 expo start --dev-client",
-   "start:localweb": "cross-env EXPO_NO_DEV_CLIENT=1 EXPO_PUBLIC_ENV=local EXPO_PUBLIC_API_BASE_URL=http://localhost:5001/laundry-apps-7f84c/asia-southeast2 expo start --web",
     "start:dev": "cross-env EXPO_PUBLIC_ENV=development EXPO_PUBLIC_API_BASE_URL=https://asia-southeast2-laundry-apps-7f84c.cloudfunctions.net expo start --dev-client",
     "start:prod": "cross-env EXPO_PUBLIC_ENV=production EXPO_PUBLIC_API_BASE_URL=https://asia-southeast2-laundry-apps-prod.cloudfunctions.net expo start --dev-client"
   },

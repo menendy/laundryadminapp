@@ -1,12 +1,14 @@
-// services/firebase.web.ts
+// === Firebase Web (JS SDK) ===
+console.log("🌐 firebase.web.ts (JS SDK) loaded");
 
-import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import firebase from "firebase/compat/app";
+import "firebase/compat/auth";
 import { firebaseConfig } from "./firebaseConfig";
 
-const app = initializeApp(firebaseConfig);
+// Inisialisasi aplikasinya
+if (!firebase.apps.length) {
+  firebase.initializeApp(firebaseConfig);
+}
 
-// Web instances
-export const authWeb = getAuth(app);
-export const dbWeb = getFirestore(app);
+export const auth = firebase.auth();
+export default firebase;

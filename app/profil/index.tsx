@@ -1,20 +1,21 @@
 import React from "react";
-import { View } from "react-native";
+import { View, Platform } from "react-native";
 import { Text, Avatar, Button } from "react-native-paper";
-import { useAuthStore } from "../../store/useAuthStore";
 import { useRouter } from "expo-router";
 
-import { auth } from "../../services/firebase"; // unified
+import { auth } from "../../services/firebase-auth";  // ⬅ sama
 
 export default function ProfilAkun() {
-  const logoutStore = useAuthStore((s) => s.logout);
   const router = useRouter();
 
   const handleLogout = async () => {
     try {
-      await auth.signOut();
+      if (!auth) {
+        alert("Logout tidak berlaku di Web.");
+        return;
+      }
 
-      await logoutStore();
+      await auth.signOut();
       router.replace("/auth/login");
     } catch (err) {
       console.error("Logout error:", err);
@@ -29,9 +30,7 @@ export default function ProfilAkun() {
         Admin Laundry
       </Text>
 
-      <Text variant="bodyMedium">admin@laundryinn.com</Text>
-
-      <Button mode="contained" style={{ marginTop: 20 }} onPress={handleLogout}>
+      <Button mode="contained" onPress={handleLogout} style={{ marginTop: 20 }}>
         Logout
       </Button>
     </View>
