@@ -1,10 +1,17 @@
-// === Firebase Native (Android/iOS) ===
-console.log("🔥 firebase.native.ts (RNFirebase) LOADED");
+// services/firebase.native.ts
+import { getApp } from "@react-native-firebase/app";
+import {
+  getAuth,
+  signInWithEmailAndPassword,
+  getIdToken,
+  signOut,
+} from "@react-native-firebase/auth";
 
-// Default import untuk RNFirebase
-import firebase from "@react-native-firebase/app";
-import authModule from "@react-native-firebase/auth";
+const app = getApp();
+export const auth = getAuth(app);
 
-// ⚠️ native RNFirebase tidak pakai JS SDK
-export const auth = authModule();
-export default firebase.app();
+export {
+  signInWithEmailAndPassword,
+  getIdToken,
+  signOut,
+};

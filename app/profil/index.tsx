@@ -1,9 +1,12 @@
 import React from "react";
-import { View, Platform } from "react-native";
+import { View } from "react-native";
 import { Text, Avatar, Button } from "react-native-paper";
 import { useRouter } from "expo-router";
 
-import { auth } from "../../services/firebase-auth";  // ⬅ sama
+import {
+  auth,
+  signOut
+} from "../../services/firebase";   // 🔥 universal modular firebase
 
 export default function ProfilAkun() {
   const router = useRouter();
@@ -15,7 +18,9 @@ export default function ProfilAkun() {
         return;
       }
 
-      await auth.signOut();
+      // 🔥 MODULAR API (tidak deprecated)
+      await signOut(auth);
+
       router.replace("/auth/login");
     } catch (err) {
       console.error("Logout error:", err);

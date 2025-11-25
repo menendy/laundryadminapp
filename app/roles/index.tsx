@@ -37,8 +37,8 @@ const RoleItem = memo(({ item, onDetail }: any) => (
     }}
   >
     <List.Item
-      title={`${item.name} (${item.type})`}
-      description={`App: ${item.app_access?.join(", ")}`}
+      title={`${item.name}`}
+      description={`Tipe : (${item.type}) \nApp: ${item.app_access?.join(", ")}`}
       right={() => (
         <Button textColor="#1976d2" onPress={onDetail}>
           Detail

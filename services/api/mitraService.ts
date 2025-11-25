@@ -68,6 +68,18 @@ export interface MitraResponse {
  * - Karena error sudah ditangani oleh interceptor
  */
 export const addMitra = async (payload: MitraPayload): Promise<MitraResponse> => {
-  const res = await api.post("/addMitra_v2", payload);
-  return res.data;
+  try {
+    const res = await api.post("/addMitra_v2", payload);
+    return res.data;  // success
+  } catch (err: any) {
+    // ---- PATCH PALING PENTING ----
+    return err?.response?.data || {
+      success: false,
+      message: "Gagal mengirim data",
+      status: err?.response?.status || 500,
+      errors: []
+    };
+
+  }
 };
+

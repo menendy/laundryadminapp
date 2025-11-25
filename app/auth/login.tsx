@@ -1,12 +1,20 @@
 import React, { useState } from "react";
-import { View, Platform } from "react-native";
-import { TextInput, Button, Text } from "react-native-paper";
+import { View } from "react-native";
+import { Button } from "react-native-paper";
 import { useRouter } from "expo-router";
 
-import { auth } from "../../services/firebase-auth";  // ⬅ gunakan selector aman
+import {
+  auth,
+  signInWithEmailAndPassword,
+  getIdToken,
+} from "../../services/firebase";   // 🔥 UNIVERSAL (web + native)
+
 import { loginUser } from "../../services/api/authService";
 import { useSnackbarStore } from "../../store/useSnackbarStore";
 import { useAuthStore } from "../../store/useAuthStore";
+import { firebaseErrorMessages } from "../../services/firebase-error";
+
+import ValidatedInput from "../../components/ui/ValidatedInput";
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -21,27 +29,34 @@ export default function LoginScreen() {
     try {
       setLoading(true);
 
-      if (!auth) {
-        alert("Login via Firebase tidak tersedia di Web.");
-        return;
-      }
-
-      const userCred = await auth.signInWithEmailAndPassword(email, password);
+      // ============================
+      // 🔥 LOGIN (MODULAR API)
+      // ============================
+      const userCred = await signInWithEmailAndPassword(auth, email, password);
       const fbUser = userCred.user;
 
+      // ============================
+      // 🔥 Ambil custom claims dari backend kamu
+      // ============================
       const claimRes = await loginUser({ uid: fbUser.uid });
+
       if (!claimRes.success) {
-        showSnackbar(claimRes.message || "Gagal set klaim", "error");
+        showSnackbar(claimRes.message || "Gagal memuat data user.", "error");
         return;
       }
 
-      await fbUser.getIdToken(true);
+      // ============================
+      // 🔥 Refresh token untuk claim terbaru
+      // ============================
+      await getIdToken(fbUser, true);
 
+      // ============================
+      // 🔥 Simpan ke Zustand
+      // ============================
       loginStore(
         {
           uid: fbUser.uid,
           email: fbUser.email ?? "",
-          ...claimRes.user,
         },
         claimRes.active_tenant
       );
@@ -50,7 +65,12 @@ export default function LoginScreen() {
       router.replace("/");
     } catch (err: any) {
       console.error("Login ERROR:", err);
-      showSnackbar(err.message, "error");
+
+      const message =
+        firebaseErrorMessages[err?.code] ||
+        "Tidak dapat login. Periksa email dan password Anda.";
+
+      showSnackbar(message, "error");
     } finally {
       setLoading(false);
     }
@@ -58,14 +78,28 @@ export default function LoginScreen() {
 
   return (
     <View style={{ padding: 20, marginTop: 60 }}>
-      <Text variant="titleLarge">Login Admin</Text>
+      <ValidatedInput
+        label="Email"
+        value={email}
+        onChangeText={setEmail}
+      />
 
-      <TextInput label="Email" value={email} onChangeText={setEmail} />
-      <TextInput label="Password" secureTextEntry value={password} onChangeText={setPassword} />
+      <ValidatedInput
+        label="Password"
+        secureTextEntry
+        value={password}
+        onChangeText={setPassword}
+      />
 
-      <Button mode="contained" onPress={handleLogin} loading={loading}>
-        Login
-      </Button>
+      <Button
+  mode="contained"
+  onPress={handleLogin}
+  loading={loading}
+  disabled={loading}
+  style={{ marginTop: 12 }}
+>
+  Login
+</Button>
     </View>
   );
 }

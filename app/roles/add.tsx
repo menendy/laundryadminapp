@@ -16,13 +16,13 @@ export default function AddRoleScreen() {
   const router = useRouter();
   const showSnackbar = useSnackbarStore((s) => s.showSnackbar);
 
-  const [ownerId, setOwnerId] = useState("");
+  
   const [name, setName] = useState("");
   const [desc, setDesc] = useState("");
 
   const [type, setType] = React.useState("");
-const [selectedLabel, setSelectedLabel] = React.useState("");
-const [typeOptions, setTypeOptions] = React.useState<{ id: string; label: string }[]>([]);
+  const [selectedLabel, setSelectedLabel] = React.useState("");
+  const [typeOptions, setTypeOptions] = React.useState<{ id: string; label: string }[]>([]);
 
   const [appAccess, setAppAccess] = useState<string[]>([]);
 
@@ -40,7 +40,7 @@ const [typeOptions, setTypeOptions] = React.useState<{ id: string; label: string
     const validate = () => {
     const e: any = {};
 
-    if (!ownerId.trim()) e.ownerId = "Owner wajib diisi";
+    
     if (!name.trim()) e.name = "Nama role wajib diisi";
     if (!desc.trim()) e.desc = "Deskripsi wajib diisi";
     if (appAccess.length === 0) e.access = "Pilih minimal 1 access";
@@ -59,7 +59,6 @@ const [typeOptions, setTypeOptions] = React.useState<{ id: string; label: string
       setLoading(true);
 
       const result = await addRole({
-        owner_id: ownerId.trim(),
         name: name.trim(),
         description: desc.trim(),
         type,
@@ -79,12 +78,12 @@ const [typeOptions, setTypeOptions] = React.useState<{ id: string; label: string
     }
   };
 
- React.useEffect(() => {
-  getRoleTypes().then((res) => {
-    if (res.success) {
-      setTypeOptions(res.data);
-    }
-  });
+    React.useEffect(() => {
+      getRoleTypes().then((res) => {
+        if (res.success) {
+          setTypeOptions(res.data);
+        }
+      });
 }, []);
 
  
@@ -93,14 +92,7 @@ const [typeOptions, setTypeOptions] = React.useState<{ id: string; label: string
       <AppHeaderActions title="Tambah Role" showBack />
 
       <ScrollView contentContainerStyle={{ padding: 20 }}>
-        <ValidatedInput
-          label="Owner ID"
-          required
-          placeholder="OWNER_A"
-          value={ownerId}
-          onChangeText={setOwnerId}
-          error={errors.ownerId}
-        />
+       
 
         <ValidatedInput
           label="Nama Role"

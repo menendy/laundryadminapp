@@ -1,19 +1,29 @@
 import { api } from "./client";
 
 export interface PageAdminPayload {
-  owner_id: string;
+ 
   name: string;
   path: string;
   component: string;
-  sort: number;
   active: boolean;
-  allowed_roles: string[];
-  permissions: Record<string, string[]>;
+  canViewBy: string[];
+  permission_type: { [key: string]: string };
 }
 
 export const addPageAdmin = async (payload: PageAdminPayload) => {
-  const res = await api.post("/addPagesAdmin", payload);
-  return res.data;
+  try {
+    const res = await api.post("/addPagesAdmin", payload);
+    return res.data;  // success
+  } catch (err: any) {
+    // ---- PATCH PALING PENTING ----
+    return err?.response?.data || {
+      success: false,
+      message: "Gagal mengirim data",
+      status: err?.response?.status || 500,
+      errors: []
+    };
+
+  }
 };
 
 export const getPagesAdminList = async (

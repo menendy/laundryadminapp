@@ -27,25 +27,37 @@ export default function AddMitraScreen() {
   };
 
   const handleSubmit = async () => {
-    if (!validate()) {
-      showSnackbar("Lengkapi semua data dengan benar", "error");
+  // Reset error sebelum submit
+  setErrors({});
+
+  // Kalau validasi local gagal, stop
+  if (!validate()) {
+    showSnackbar("Lengkapi semua data dengan benar", "error");
+    return;
+  }
+
+  try {
+    setLoading(true);
+
+    const result = await addMitra({ nama, telp, alamat });
+
+    const ok = handleBackendError(result, setErrors, showSnackbar);
+
+    if (!ok) {
+      // ❗ KUNCI UTAMA: JANGAN return sebelum React render error-nya
       return;
     }
 
-    try {
-      setLoading(true);
-      const result = await addMitra({ nama, telp, alamat });
-      const ok = handleBackendError(result, setErrors, showSnackbar);
-      if (!ok) return;
-      showSnackbar(`✅ ${result.message}`, "success");
-      router.back();
-    } catch (err) {
-      console.error("🔥 Error add mitra:", err);
-      showSnackbar("Terjadi kesalahan koneksi", "error");
-    } finally {
-      setLoading(false);
-    }
-  };
+    showSnackbar(`✅ ${result.message}`, "success");
+    router.back();
+  } catch (err) {
+    console.error("🔥 Error add mitra:", err);
+    showSnackbar("Terjadi kesalahan koneksi", "error");
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   return (
     <View style={{ flex: 1, backgroundColor: "#f9f9f9" }}>
