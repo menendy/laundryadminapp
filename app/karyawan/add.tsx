@@ -1,107 +1,249 @@
-import React, { useState } from "react";
-import { View, ScrollView } from "react-native";
-import { Button } from "react-native-paper";
+import React, { useState, useEffect } from "react";
+import { View, ScrollView, Text, Pressable } from "react-native";
+import { Button, Checkbox } from "react-native-paper";
+import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+
 import AppHeaderActions from "../../components/ui/AppHeaderActions";
 import ValidatedInput from "../../components/ui/ValidatedInput";
-import { useSnackbarStore } from "../../store/useSnackbarStore";
+import DropDownPicker from "react-native-dropdown-picker";
 import { addMitra } from "../../services/api/mitraService";
+import { getRoleListLite } from "../../services/api/rolesService";
+import { useSnackbarStore } from "../../store/useSnackbarStore";
 import { handleBackendError } from "../../utils/handleBackendError";
 
-export default function AddMitraScreen() {
+export default function AddKaryawanScreen() {
   const router = useRouter();
   const showSnackbar = useSnackbarStore((s) => s.showSnackbar);
+
   const [nama, setNama] = useState("");
   const [telp, setTelp] = useState("");
   const [alamat, setAlamat] = useState("");
+  const [email, setEmail] = useState("");
+  const [alias, setAlias] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+
+  const [assignRole, setAssignRole] = useState(false);
+  const [roles, setRoles] = useState<any[]>([]);
+  const [roleId, setRoleId] = useState<any[]>([]); // multi role
+
+
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+
+  const [errors, setErrors] = useState<any>({});
   const [loading, setLoading] = useState(false);
-  const [errors, setErrors] = useState<{ nama?: string; telp?: string; alamat?: string }>({});
 
   const validate = () => {
-    const newErrors: any = {};
-    if (!nama.trim()) newErrors.nama = "Nama Mitra tidak boleh kosong";
-    if (!telp.trim()) newErrors.telp = "Nomor Telepon tidak boleh kosong";
-    if (!alamat.trim()) newErrors.alamat = "Alamat tidak boleh kosong";
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    const e: any = {};
+
+    if (!nama.trim()) e.nama = "Nama tidak boleh kosong";
+    if (!telp.trim()) e.telp = "Nomor Telepon tidak boleh kosong";
+    if (!alamat.trim()) e.alamat = "Alamat tidak boleh kosong";
+
+    if (assignRole && !roleId)
+      e.roleId = "Pilih level akses terlebih dahulu";
+
+    setErrors(e);
+    return Object.keys(e).length === 0;
   };
 
+  const loadRoles = async () => {
+    try {
+      const res = await getRoleListLite();
+      if (res.success) {
+        setRoles(res.data.map((r: any) => ({
+          label: r.name,
+          value: r.id,
+        })));
+      }
+    } catch (err) {
+      console.error("loadRoles error:", err);
+    }
+  };
+
+  useEffect(() => {
+    if (assignRole) loadRoles();
+  }, [assignRole]);
+
   const handleSubmit = async () => {
-  // Reset error sebelum submit
-  setErrors({});
-
-  // Kalau validasi local gagal, stop
-  if (!validate()) {
-    showSnackbar("Lengkapi semua data dengan benar", "error");
-    return;
-  }
-
-  try {
-    setLoading(true);
-
-    const result = await addMitra({ nama, telp, alamat });
-
-    const ok = handleBackendError(result, setErrors, showSnackbar);
-
-    if (!ok) {
-      // ❗ KUNCI UTAMA: JANGAN return sebelum React render error-nya
+    if (!validate()) {
+      showSnackbar("Lengkapi data dengan benar", "error");
       return;
     }
 
-    showSnackbar(`✅ ${result.message}`, "success");
-    router.back();
-  } catch (err) {
-    console.error("🔥 Error add mitra:", err);
-    showSnackbar("Terjadi kesalahan koneksi", "error");
-  } finally {
-    setLoading(false);
-  }
-};
+    try {
+      setLoading(true);
 
+      // PAYLOAD SESUAI FORMAT BACKEND ✔
+      const payload = {
+        name: nama.trim(),
+        alias: alias.trim(),
+        phone: telp.trim(),
+        address: alamat.trim(),
+        role_ids: assignRole ? roleId : null,
+        email: email.trim(),
+        password: password,
+        confirm: confirm,
+      };
+
+      const result = await addMitra(payload);
+      const ok = handleBackendError(result, setErrors, showSnackbar);
+      if (!ok) return;
+
+      showSnackbar("Karyawan berhasil ditambahkan", "success");
+      router.back();
+    } catch (err) {
+      console.error("🔥 Error addKaryawan:", err);
+      showSnackbar("Terjadi kesalahan koneksi", "error");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <View style={{ flex: 1, backgroundColor: "#f9f9f9" }}>
-      {/* ✅ Header dengan tombol back dan simpan */}
-      <AppHeaderActions
-        title="Tambah Mitra"
-        showBack={true}
-      />
+      <AppHeaderActions title="Tambah Karyawan" showBack />
 
-      <ScrollView contentContainerStyle={{ padding: 20 }}>
+      <ScrollView
+        contentContainerStyle={{
+          padding: 20,
+          paddingBottom: 120, // 👈 Tambah jarak aman untuk tombol + navbar
+        }}
+        keyboardShouldPersistTaps="handled" // 👈 optional biar input tetap fokus
+      >
         <ValidatedInput
-          label="Nama Mitra"
+          label="Nama Lengkap"
           required
-          placeholder="Contoh: Harmania Laundry"
+          placeholder="Contoh: Ridwan Tamar"
           value={nama}
           onChangeText={setNama}
           error={errors.nama}
         />
+
+        <ValidatedInput
+          label="Password"
+          required
+          value={password}
+          onChangeText={setPassword}
+          error={errors.password}
+          secureTextEntry
+        />
+
+        <ValidatedInput
+          label="Konfirmasi Password"
+          required
+          value={confirm}
+          onChangeText={setConfirm}
+          error={errors.confirm}
+          secureTextEntry
+        />
+
+        <ValidatedInput
+          label="Nama Panggilan"
+
+          placeholder="Contoh: Ridwan"
+          value={alias}
+          onChangeText={setAlias}
+          error={errors.nama}
+        />
+
         <ValidatedInput
           label="Nomor Telepon"
           required
           keyboardType="phone-pad"
-          placeholder="Contoh: 08123456789"
+          placeholder="contoh: 08123456789"
           value={telp}
           onChangeText={setTelp}
           error={errors.telp}
         />
+
+        <ValidatedInput
+          label="Email"
+          required
+          keyboardType="email-address"
+          placeholder="contoh: laundry@gmail.com"
+          value={email}
+          onChangeText={setEmail}
+          error={errors.telp}
+        />
+
+
+
         <ValidatedInput
           label="Alamat"
           required
-          placeholder="Contoh: Jl. Fatmawati No. 45, Jakarta Selatan"
+          placeholder="Jl. Mawar No. 10"
           value={alamat}
           onChangeText={setAlamat}
           error={errors.alamat}
         />
+
+        {/* Checkbox Assign Role */}
+        <Pressable
+          onPress={() => setAssignRole((v) => !v)}
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            marginTop: 25,
+          }}
+        >
+          <Checkbox
+            status={assignRole ? "checked" : "unchecked"}
+            onPress={() => setAssignRole((v) => !v)}
+          />
+          <Text style={{ fontSize: 15, fontWeight: "600", color: "#007AFF" }}>
+            Berikan akses Admin
+          </Text>
+        </Pressable>
+
+        {/* Dropdown Role */}
+        {assignRole && (
+          <View style={{ marginTop: 20, zIndex: 2000 }}>
+            <Text style={{ fontWeight: "600", marginBottom: 6 }}>
+              Level Akses *
+            </Text>
+
+            <DropDownPicker
+              multiple={true}          // 👈 MODE MULTI SELECT
+              mode="BADGE"             // 👈 Tampilan badge: Leader, Staff
+              min={0}
+              max={5}                  // 👈 Batas jumlah role (optional)
+
+              open={dropdownOpen}
+              value={roleId}
+              items={roles}
+              setOpen={setDropdownOpen}
+              setValue={setRoleId}
+              setItems={setRoles}
+
+              placeholder="Pilih Item"
+              searchable
+
+              listMode="SCROLLVIEW"
+              zIndex={3000}
+              zIndexInverse={1000}
+
+              style={{
+                borderColor: errors.roleId ? "red" : "#ccc",
+              }}
+            />
+
+            {errors.roleId && (
+              <Text style={{ color: "red", marginTop: 4 }}>{errors.roleId}</Text>
+            )}
+          </View>
+        )}
+
 
         <Button
           mode="contained"
           onPress={handleSubmit}
           loading={loading}
           disabled={loading}
-          style={{ marginTop: 16 }}
+          style={{ marginTop: 25 }}
         >
-          {loading ? "Menyimpan..." : "Tambah Mitra"}
+          {loading ? "Menyimpan..." : "Tambah Karyawan"}
         </Button>
       </ScrollView>
     </View>

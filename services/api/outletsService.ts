@@ -32,26 +32,33 @@ export interface OutletListResponse {
   nextCursor?: string | null;
   limit?: number;
   total?: number;
+  message?: string;
+  status?: number;
 }
 
 
 export const getOutletList = async (
+  modul: string,
+  pagePath: string,
   search: string | null = null,
   cursor: string | null = null,
-  limit = 10
+  limit = 10,
+  mode: "semua" | "name" | "path" | "component" = "semua"
 ): Promise<OutletListResponse> => {
-  try {
-    const params = new URLSearchParams();
-    if (search) params.append("search", search);
-    if (cursor) params.append("cursor", cursor);
-    params.append("limit", limit.toString());
 
-    const res = await api.get(`/getOutletList?${params.toString()}`);
-    return res.data;
-  } catch (err: any) {
-    console.error("❌ getOutletList error:", err);
-    return { success: false, data: [] };
-  }
+  const params = new URLSearchParams();
+
+  params.append("modul", modul);
+  params.append("path", pagePath);
+
+  if (search) params.append("search", search);
+  if (cursor) params.append("cursor", cursor);
+
+  params.append("limit", limit.toString());
+  params.append("mode", mode);
+
+  const res = await api.get(`/getOutletList?${params.toString()}`);
+  return res.data;     // 🟢 jika success langsung return
 };
 
 

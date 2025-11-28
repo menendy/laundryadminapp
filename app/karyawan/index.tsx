@@ -43,7 +43,7 @@ export default function MitraListScreen() {
   const router = useRouter();
   //const pathname = usePathname() ?? "/karyawan";
   const pathname = usePathname();;
-  const modul = "Karyawan"; // tetap hardcoded seperti permintaan
+  const modul = "Karyawan"; 
 
   const showSnackbar = useSnackbarStore((s) => s.showSnackbar);
 

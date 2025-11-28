@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { View, ScrollView, Text, Pressable, Platform } from "react-native";
-import { Button, Chip, Portal } from "react-native-paper";
+import { View, ScrollView, Text, Pressable, Platform, Switch, Animated, TouchableOpacity } from "react-native";
+import { Button, Portal } from "react-native-paper";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 
@@ -12,7 +12,11 @@ import { handleBackendError } from "../../utils/handleBackendError";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 
+
+
 export default function AddPageAdminScreen() {
+
+
   const router = useRouter();
   const showSnackbar = useSnackbarStore((s) => s.showSnackbar);
 
@@ -113,11 +117,11 @@ export default function AddPageAdminScreen() {
       prev.map((row, i) =>
         i === index
           ? {
-              ...row,
-              [key]: value,
-              isDefault: false,
-              defaultId: null,
-            }
+            ...row,
+            [key]: value,
+            isDefault: false,
+            defaultId: null,
+          }
           : row
       )
     );
@@ -126,41 +130,35 @@ export default function AddPageAdminScreen() {
   const validate = () => {
     const e: any = {};
 
-    //if (!name.trim()) e.name = "Nama halaman wajib diisi";
-    //if (!path.trim()) e.path = "Path wajib diisi";
+    if (!name.trim()) e.name = "Nama halaman wajib diisi";
+    if (!path.trim()) e.path = "Path wajib diisi";
     if (!component.trim()) e.component = "Component wajib diisi";
-    
+
     // Buat ulang permission_type untuk validasi
-      const permission_type = Object.fromEntries(
-        permissionList
-          .filter((x) => x.url?.trim() && x.permission?.trim())
-          .map((x) => [x.url.trim(), x.permission.trim()])
-      );
+    const permission_type = Object.fromEntries(
+      permissionList
+        .filter((x) => x.url?.trim() && x.permission?.trim())
+        .map((x) => [x.url.trim(), x.permission.trim()])
+    );
 
-      // Validasi minimal satu permission valid
-      if (Object.keys(permission_type).length === 0) {
-        e.perm = "Minimal 1 permission harus diatur";
-      }
+    // Validasi minimal satu permission valid
+    if (Object.keys(permission_type).length === 0) {
+      e.perm = "Minimal 1 permission harus diatur";
+    }
 
 
-      setErrors(e);
-      return Object.keys(e).length === 0;
+    setErrors(e);
+    return Object.keys(e).length === 0;
   };
 
   const handleSubmit = async () => {
-    if (!validate()) {
-      showSnackbar("Lengkapi data dengan benar", "error");
-      return;
-    }
+    // ===== FRONTEND VALIDATION =====
+    if (!validate()) { showSnackbar("Lengkapi data dengan benar", "error"); return; }
 
     try {
       setLoading(true);
 
-      const permission_type = Object.fromEntries(
-        permissionList
-          .filter((x) => x.url && x.permission)
-          .map((x) => [x.url, x.permission])
-      );
+      const permission_type = Object.fromEntries( permissionList .filter((x) => x.url && x.permission) .map((x) => [x.url, x.permission]) );
 
       const payload = {
         name: name.trim(),
@@ -171,20 +169,79 @@ export default function AddPageAdminScreen() {
         permission_type,
       };
 
+
       const result = await addPageAdmin(payload);
 
+      // ============================================================
+      // 🔥 UNIVERSAL ERROR HANDLER (Backend + Network)
+      // ============================================================
       const ok = handleBackendError(result, setErrors, showSnackbar);
       if (!ok) return;
 
       showSnackbar("Halaman berhasil ditambahkan", "success");
-      router.back();
+      //router.back();
+
     } catch (err) {
       console.error("🔥 Error addPageAdmin:", err);
-      showSnackbar("Terjadi kesalahan koneksi", "error");
+
+      // ============================================================
+      // 🔥 Global catch (NETWORK ERROR / AXIOS ERROR)
+      // ============================================================
+      handleBackendError(err, setErrors, showSnackbar);
+
     } finally {
       setLoading(false);
     }
   };
+
+
+  const IOSSwitch = ({ value, onChange }: any) => {
+    const animated = React.useRef(new Animated.Value(value ? 1 : 0)).current;
+
+    React.useEffect(() => {
+      Animated.timing(animated, {
+        toValue: value ? 1 : 0,
+        duration: 180,
+        useNativeDriver: false,
+      }).start();
+    }, [value]);
+
+    const translate = animated.interpolate({
+      inputRange: [0, 1],
+      outputRange: [2, 22],
+    });
+
+    return (
+      <TouchableOpacity
+        activeOpacity={0.9}
+        onPress={() => onChange(!value)}
+        style={{
+          width: 46,
+          height: 28,
+          borderRadius: 20,
+          justifyContent: "center",
+          padding: 2,
+          backgroundColor: value ? "#34C759" : "#E5E5EA",
+        }}
+      >
+        <Animated.View
+          style={{
+            width: 24,
+            height: 24,
+            borderRadius: 12,
+            backgroundColor: "#fff",
+            shadowColor: "#000",
+            shadowOpacity: 0.2,
+            shadowRadius: 2,
+            transform: [{ translateX: translate }],
+          }}
+        />
+      </TouchableOpacity>
+    );
+  };
+
+
+
 
   return (
     <View style={{ flex: 1, backgroundColor: "#f9f9f9" }}>
@@ -219,43 +276,42 @@ export default function AddPageAdminScreen() {
         />
 
         {/* STATUS */}
-        <Text style={{ marginTop: 20, fontWeight: "700" }}>Status Halaman</Text>
-        <View style={{ flexDirection: "row", gap: 10, marginTop: 10 }}>
-          <Chip selected={active} onPress={() => setActive(true)}>Aktif</Chip>
-          <Chip selected={!active} onPress={() => setActive(false)}>Nonaktif</Chip>
+        <View style={{ marginTop: 20 }}>
+          <Text style={{ fontWeight: "700", marginBottom: 10 }}>
+            Status Halaman
+          </Text>
+
+          <View style={{ flexDirection: "row", alignItems: "center" }}>
+            <IOSSwitch value={active} onChange={setActive} />
+            <Text style={{ marginLeft: 10, fontSize: 15, fontWeight: "600" }}>
+              {active ? "Aktif" : "Nonaktif"}
+            </Text>
+          </View>
+
+          {errors.active && (
+            <Text style={{ color: "red", marginTop: 6 }}>{errors.active}</Text>
+          )}
         </View>
-        {errors.active && <Text style={{ color: "red" }}>{errors.active}</Text>}
+
+
 
         {/* SYSADMIN */}
         <Text style={{ marginTop: 20, fontWeight: "700" }}>
           Hanya bisa dilihat dan diedit sysadmin
         </Text>
 
-        <View style={{ marginTop: 12, gap: 12 }}>
-          <Pressable
-            onPress={() => setcanViewBy(true)}
-            style={{ flexDirection: "row", alignItems: "center", gap: 10 }}
-          >
-            <Ionicons
-              name={canViewBy ? "radio-button-on" : "radio-button-off"}
-              size={22}
-              color={canViewBy ? "#007aff" : "#777"}
-            />
-            <Text style={{ fontSize: 15 }}>Ya</Text>
-          </Pressable>
+        <View style={{ marginTop: 12, flexDirection: "row", alignItems: "center", gap: 12 }}>
+          <IOSSwitch value={canViewBy} onChange={setcanViewBy} />
 
-          <Pressable
-            onPress={() => setcanViewBy(false)}
-            style={{ flexDirection: "row", alignItems: "center", gap: 10 }}
-          >
-            <Ionicons
-              name={!canViewBy ? "radio-button-on" : "radio-button-off"}
-              size={22}
-              color={!canViewBy ? "#007aff" : "#777"}
-            />
-            <Text style={{ fontSize: 15 }}>Tidak</Text>
-          </Pressable>
+          <Text style={{ fontSize: 15, fontWeight: "600" }}>
+            {canViewBy ? "Ya" : "Tidak"}
+          </Text>
         </View>
+
+        {errors.canViewBy && (
+          <Text style={{ color: "red", marginTop: 6 }}>{errors.canViewBy}</Text>
+        )}
+
 
         {/* OPEN PERMISSION MODAL */}
         <Pressable
@@ -299,19 +355,19 @@ export default function AddPageAdminScreen() {
       <Portal>
         {permissionModalVisible && (
           <View
-              style={{
-                position: Platform.OS === "web" ? "fixed" : "absolute",
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                backgroundColor: "#fff",
-                paddingTop: 50,
-                zIndex: 999999,
-                elevation: 999999,
-                pointerEvents: "auto",
-              }}
-            >
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: "#fff",
+              paddingTop: 50,
+              zIndex: 999999,
+              elevation: 999999,
+              pointerEvents: "auto",
+            }}
+          >
 
             {/* Header */}
             <View
@@ -392,6 +448,7 @@ export default function AddPageAdminScreen() {
                     Permission
                   </Text>
                   <ValidatedInput
+
                     value={row.permission}
                     onChangeText={(v) =>
                       updatePermission(idx, "permission", v)
@@ -404,24 +461,24 @@ export default function AddPageAdminScreen() {
 
             {/* Fixed Bottom Button */}
             <View
-  style={{
-    position: Platform.OS === "web" ? "fixed" : "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-    padding: 20,
-    paddingBottom: 20 + insets.bottom,
-    backgroundColor: "#fff",
-    borderTopWidth: 1,
-    borderColor: "#ddd",
-    zIndex: 1000000,
-  }}
->
+              style={{
+                position: Platform.OS === "web" ? "fixed" : "absolute",
+                left: 0,
+                right: 0,
+                bottom: 0,
+                padding: 20,
+                paddingBottom: 20 + insets.bottom,
+                backgroundColor: "#fff",
+                borderTopWidth: 1,
+                borderColor: "#ddd",
+                zIndex: 1000000,
+              }}
+            >
 
-               <Button
-    mode="contained"
-    onPress={() => setPermissionModalVisible(false)}
-  >
+              <Button
+                mode="contained"
+                onPress={() => setPermissionModalVisible(false)}
+              >
                 Simpan & Tutup
               </Button>
             </View>

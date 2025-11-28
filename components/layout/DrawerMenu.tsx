@@ -30,6 +30,7 @@ const MENU_JSON: MenuItem[] = [
   { key: "login", label: "login", icon: "view-dashboard", path: "auth/login" },
   { key: "profil", label: "Profil Akun", icon: "account-circle", path: "/profil" },
   { key: "karyawan", label: "Karyawan", icon: "account-group", path: "/karyawan" },
+  { key: "akses_pengguna", label: "Akses Pengguna", icon: "account-group", path: "/akses_pengguna" },
 
   {
     key: "pengaturanAkses",

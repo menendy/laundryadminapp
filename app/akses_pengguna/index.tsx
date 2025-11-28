@@ -10,13 +10,14 @@ import Animated, { ZoomIn, ZoomOut } from "react-native-reanimated";
 import { MaterialCommunityIcons  } from "@expo/vector-icons";
 import { useRouter, usePathname } from "expo-router";
 
-import { getPagesAdminList } from "../../services/api/pagesAdminService";
+
+import { getAksesAdminList } from "../../services/api/aksesPenggunaService";
 import AppHeaderList from "../../components/ui/AppHeaderList";
 import AppSearchBarBottomSheet from "../../components/ui/AppSearchBarBottomSheet";
 import { useUniversalPaginatedList } from "../../hooks/UniversalPaginatedList";
 
 /* CARD */
-const PageAdminItem = memo(({ item, activeMenuId, onOpenMenu, onCloseMenu, onView, onEdit }: any) => {
+const AksesPenggunaItem = memo(({ item, activeMenuId, onOpenMenu, onCloseMenu, onView, onEdit }: any) => {
 
   const copyId = () => {
     Clipboard.setString(item.id);
@@ -45,31 +46,13 @@ const PageAdminItem = memo(({ item, activeMenuId, onOpenMenu, onCloseMenu, onVie
       description={
         <>
         <View style={{ marginTop: 4 }}>
-          {/* Component */}
-          <View style={{ flexDirection: "row", marginBottom: 2 }}>
-            <Text style={{ fontSize: 14, fontWeight: "600" }}>
-            Component :
-            </Text>
-            <Text style={{ fontSize: 14, marginLeft: 3 }}>
-            {item.component}
-            </Text>
-          </View>
+         
 
-          {/* Path */}
-          <View style={{ flexDirection: "row", marginBottom: 3 }}>
-            <Text style={{ fontSize: 14, fontWeight: "600" }}>
-            Path :
-            </Text>
-            <Text style={{ fontSize: 14, marginLeft: 3 }}>
-              {item.path}
-            </Text>
-          </View>
-
-          {/* Status */}
+          {/* Description */}
           <View style={{ flexDirection: "row", marginBottom: 2 }}>
            
           <Text style={{ fontSize: 14, color: item.active ? "green" : "red", fontWeight: "600" }}>
-          {item.active ? "Aktif" : "Tidak Aktif"}
+          {item.description}
           </Text>
           </View>
        
@@ -178,22 +161,22 @@ const PageAdminItem = memo(({ item, activeMenuId, onOpenMenu, onCloseMenu, onVie
 
 });
 
-
-export default function PagesAdminListScreen() {
+  
+export default function AksesPenggunaListScreen() {
   const router = useRouter();
   const pathname = usePathname();
 
   const list = useUniversalPaginatedList({
-    modul: "pages_admin",
+    modul: "akses_pengguna",
     pathname,
-    fetchFn: getPagesAdminList,
+    fetchFn: getAksesAdminList,
     defaultMode: "semua",
   });
 
   const [activeMenuId, setActiveMenuId] = React.useState<string | null>(null);
 
     const renderItem = ({ item }: any) => (
-      <PageAdminItem
+      <AksesPenggunaItem
       item={item}
       activeMenuId={activeMenuId}
       onOpenMenu={() => setActiveMenuId(item.id)}
@@ -211,19 +194,18 @@ export default function PagesAdminListScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: "#f9f9f9" }}>
-      <AppHeaderList title="Halaman Admin" onAdd={() => router.push("/pages_admin/add")} />
+      <AppHeaderList title="Pengaturan Akses Pengguna" onAdd={() => router.push("/akses_pengguna/add")} />
 
       <AppSearchBarBottomSheet
         value={list.search}
         onChangeText={list.setSearch}
         mode={list.mode}
         onChangeMode={(m) => list.setMode(m)}
-        placeholder="Cari nama, path, component..."
+        placeholder="Cari nama..."
         categories={[
           { label: "Semua", value: "semua" },
-          { label: "Name", value: "name" },
-          { label: "Path", value: "path" },
-          { label: "Component", value: "component" },
+          { label: "Nama", value: "name" },
+          { label: "Description", value: "description" }
         ]}
         defaultMode="semua"
       />

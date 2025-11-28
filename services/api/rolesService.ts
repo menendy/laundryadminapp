@@ -65,15 +65,12 @@ export const getRoleTypes = async(): Promise<RoleTypesResponse> => {
 /* ------------------------------------------
    ROLE LIST LITE (dropdown)
 -------------------------------------------*/
-export const getRoleListLite = async (ownerId: string) => {
+export const getRoleListLite = async () => {
   try {
-    const params = new URLSearchParams();
-    params.append("owner_id", ownerId);
-
-    const res = await api.get(`/getRoleListLite?${params.toString()}`);
-    return res.data; // array: [{id, name}]
+    const res = await api.get("/getRoleListLite");
+    return res.data; // { success, data }
   } catch (err) {
     console.error("❌ getRoleListLite error:", err);
-    return [];
+    return { success: false, data: [] };
   }
 };

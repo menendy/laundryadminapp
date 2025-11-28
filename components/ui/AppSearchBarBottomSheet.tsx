@@ -16,7 +16,11 @@ import {
   IconButton,
 } from "react-native-paper";
 
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+
 const { height } = Dimensions.get("window");
+
 
 interface Category {
   label: string;
@@ -26,7 +30,7 @@ interface Category {
 interface AppSearchBarBottomSheetProps {
   value: string;
   onChangeText: (text: string) => void;
-  mode: string;
+  mode?: string;
   onChangeMode: (newMode: string) => void;
   placeholder?: string;
   categories?: Category[];
@@ -82,6 +86,8 @@ export default function AppSearchBarBottomSheet({
     categories.find((c) => c.value === mode)?.label ||
     categories.find((c) => c.value === defaultMode)?.label ||
     "Semua";
+  
+    const insets = useSafeAreaInsets();
 
   return (
     <>
@@ -119,7 +125,7 @@ export default function AppSearchBarBottomSheet({
             <Animated.View
               style={[styles.sheetContainer, { transform: [{ translateY }] }]}
             >
-              <Surface style={styles.sheet}>
+              <Surface style={[styles.sheet, { paddingBottom: insets.bottom + 20 }]}>
                 <View style={styles.sheetHeader}>
                   <Text style={styles.sheetTitle}>Pilih kategori pencarian</Text>
                   <IconButton icon="close" onPress={closeSheet} />

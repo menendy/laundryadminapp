@@ -1,9 +1,7 @@
 import { api } from "./client";
 
 export interface MitraPayload {
-  nama: string;
-  telp: string;
-  alamat: string;
+ 
 }
 
 export interface MitraListResponse {
