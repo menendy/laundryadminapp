@@ -64,3 +64,35 @@ export const getAksesAdminList = async (
   const res = await api.get(`/getRoleList?${params.toString()}`);
   return res.data;     // 🟢 jika success langsung return
 };
+
+export interface PermissionItem {
+  page_id: string;
+  actions: string[]; // misalnya: ["view", "create", "edit", "delete"]
+}
+
+// =============================
+// 🔹 GET BY ID (untuk EDIT / preload)
+// =============================
+export const getAksesPenggunaById = async (roleId: string, path: string) => {
+  //const normalizedPath = pagePath;
+  const res = await api.get("/getAksesPenggunaById", {
+    params: {
+      roleId,
+      path
+    }
+  });
+
+  return res.data?.data ?? null;
+};
+
+
+// =============================
+// 🔹 UPDATE
+// =============================
+export const updateAksesPengguna = async (
+  roleId: string,
+  payload: AksesPenggunaPayload
+) => {
+  const res = await api.put(`/updateAksesPengguna?roleId=${roleId}`, payload);
+  return res.data;
+};

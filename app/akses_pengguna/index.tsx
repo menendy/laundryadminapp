@@ -1,6 +1,6 @@
 import React, { memo } from "react";
 import { View, FlatList, RefreshControl, Keyboard,Text,
-  TouchableOpacity, ToastAndroid, Platform, Pressable
+   ToastAndroid, Platform, Pressable
  } from "react-native";
 import { Card, List, ActivityIndicator } from "react-native-paper";
 import Clipboard from "@react-native-clipboard/clipboard";
@@ -183,11 +183,11 @@ export default function AksesPenggunaListScreen() {
       onCloseMenu={() => setActiveMenuId(null)}
       onView={(i: any) => {
         setActiveMenuId(null);
-        router.push(`/pages_admin/${i.id}`);
+        router.push(`/akses_pengguna/${i.id}`);
       }}
       onEdit={(i: any) => {
         setActiveMenuId(null);
-        router.push(`/pages_admin/edit/${i.id}`);
+        router.push(`/akses_pengguna/edit/${i.id}`);
       }}
     />
     );

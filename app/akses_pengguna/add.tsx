@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from "react";
-import { View, ScrollView, Text, Pressable, Platform, Switch, Animated, TouchableOpacity } from "react-native";
-import { Button, Portal, Chip } from "react-native-paper";
-import { useRouter } from "expo-router";
+import React, { useState } from "react";
+import { View, ScrollView, Text, Pressable } from "react-native";
+import { Button, Chip } from "react-native-paper";
+import { useRouter,usePathname } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 
 import AppHeaderActions from "../../components/ui/AppHeaderActions";
@@ -16,13 +16,14 @@ import { useRolePermissionStore } from "../../store/useRolePermissionStore";
 export default function AddAksesPenggunaScreen() {
 
   const router = useRouter();
+  const pathname = usePathname();
+ 
   const showSnackbar = useSnackbarStore((s) => s.showSnackbar);
 
 
   const [name, setName] = useState("");
   const [desc, setDesc] = useState("");
 
-  const [pageOption, setPageOption] = React.useState("");
 
 
   const [appAccess, setAppAccess] = useState<string[]>([]);
@@ -40,9 +41,9 @@ export default function AddAksesPenggunaScreen() {
     const e: any = {};
 
 
-    if (!name.trim()) e.name = "Nama role wajib diisi";
-    if (!desc.trim()) e.desc = "Deskripsi wajib diisi";
-    if (appAccess.length === 0) e.access = "Pilih minimal 1 access";
+    //if (!name.trim()) e.name = "Nama role wajib diisi";
+    //if (!desc.trim()) e.desc = "Deskripsi wajib diisi";
+    //if (appAccess.length === 0) e.access = "Pilih minimal 1 access";
 
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -72,6 +73,7 @@ export default function AddAksesPenggunaScreen() {
         description: desc.trim(),
         appAccess : appAccess,
         permissions: formattedPermissions,
+        pathname
       };
 
       const result = await addAksesPengguna(payload);
@@ -105,7 +107,7 @@ export default function AddAksesPenggunaScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: "#f9f9f9" }}>
-      <AppHeaderActions title="Tambah Role" showBack />
+      <AppHeaderActions title="Tambah Akses Pengguna" showBack />
 
       <ScrollView contentContainerStyle={{ padding: 20 }}>
 

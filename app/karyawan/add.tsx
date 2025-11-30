@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { View, ScrollView, Text, Pressable } from "react-native";
 import { Button, Checkbox } from "react-native-paper";
-import { Ionicons } from "@expo/vector-icons";
+
 import { useRouter } from "expo-router";
 
 import AppHeaderActions from "../../components/ui/AppHeaderActions";
@@ -205,16 +205,17 @@ export default function AddKaryawanScreen() {
             </Text>
 
             <DropDownPicker
-              multiple={true}          // 👈 MODE MULTI SELECT
-              mode="BADGE"             // 👈 Tampilan badge: Leader, Staff
-              min={0}
-              max={5}                  // 👈 Batas jumlah role (optional)
+              multiple={false}  // 👈 hanya 1 role
+              mode="SIMPLE"     // 👈 tanpa badge multi
 
               open={dropdownOpen}
-              value={roleId}
+              value={roleId[0] ?? null}   // 👈 gunakan elemen pertama
               items={roles}
               setOpen={setDropdownOpen}
-              setValue={setRoleId}
+              setValue={(callback) => {
+                const selected = callback(roleId[0]);
+                setRoleId(selected ? [selected] : []);
+              }}
               setItems={setRoles}
 
               placeholder="Pilih Item"
@@ -234,6 +235,7 @@ export default function AddKaryawanScreen() {
             )}
           </View>
         )}
+
 
 
         <Button
