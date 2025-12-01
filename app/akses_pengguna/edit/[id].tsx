@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { View, ScrollView, Text, Pressable } from "react-native";
 import { Button, Chip } from "react-native-paper";
-import { useRouter, useLocalSearchParams,usePathname } from "expo-router";
+import { useRouter, useLocalSearchParams,usePathname  } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 
 import AppHeaderActions from "../../../components/ui/AppHeaderActions";
@@ -14,12 +14,19 @@ import {
 import { useSnackbarStore } from "../../../store/useSnackbarStore";
 import { handleBackendError } from "../../../utils/handleBackendError";
 import { useRolePermissionStore } from "../../../store/useRolePermissionStore";
+import { useBasePath } from "../../../utils/useBasePath";
+
+
 
 export default function EditAksesPenggunaScreen() {
   const { id } = useLocalSearchParams();       // id role dari URL
   const router = useRouter();
+ 
+
   const showSnackbar = useSnackbarStore((s) => s.showSnackbar);
-  const pathname = usePathname();
+  
+
+  const { rootBase: rootPath, basePath } = useBasePath();
 
   const [name, setName] = useState("");
   const [desc, setDesc] = useState("");
@@ -40,13 +47,13 @@ useEffect(() => {
     try {
       setInitialLoading(true);
 
-      console.log("pathname:", pathname);
-      const data = await getAksesPenggunaById(String(id),pathname);
+      //console.log("pathname:", pathname);
+      const data = await getAksesPenggunaById(String(id),rootPath,basePath);
       if (!data) return;
 
       setName(data.name ?? "");
       setDesc(data.description ?? "");
-      setAppAccess(data.appAccess ?? []);
+      setAppAccess(data.app_access ?? []);
 
       const permsArray: PermissionItem[] = data.permissions ?? [];
       const mapped: Record<string, string[]> = {};

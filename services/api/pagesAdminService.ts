@@ -6,6 +6,7 @@ export interface PageAdminPayload {
   path: string;
   component: string;
   active: boolean;
+  is_public: boolean;
   canViewBy: string[];
   permission_type: { [key: string]: string };
 }
@@ -15,7 +16,32 @@ export const addPageAdmin = async (payload: PageAdminPayload) => {
   return res.data;
 };
 
-export const updatePageAdmin = async (payload: PageAdminPayload) => {
+export interface PermissionDiffItem {
+  originalUrl: string;
+  originalPermission: string;
+  url: string;
+  permission: string;
+}
+
+export interface SyncPermissionsDiff {
+  update: PermissionDiffItem[];
+}
+
+export interface PageUpdateAdminPayload {
+  id:string;
+  name: string;
+  path: string;
+  component: string;
+  active: boolean;
+  is_public: boolean;
+  canViewBy: string[];
+  permission_type: { [key: string]: string };
+  sync_permissions_diff: SyncPermissionsDiff;
+}
+
+
+
+export const updatePageAdmin = async (payload: PageUpdateAdminPayload) => {
   const res = await api.put("/updatePagesAdmin", payload);
   return res.data;
 };

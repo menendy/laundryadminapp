@@ -25,6 +25,10 @@ export default function AddPageAdminScreen() {
   const [component, setComponent] = useState("");
 
   const [active, setActive] = useState(true);
+
+  const [isPublic, setIsPublic] = useState(true);
+
+
   const [canViewBy, setcanViewBy] = useState(true);
 
   const [errors, setErrors] = useState<any>({});
@@ -158,14 +162,15 @@ export default function AddPageAdminScreen() {
     try {
       setLoading(true);
 
-      const permission_type = Object.fromEntries( permissionList .filter((x) => x.url && x.permission) .map((x) => [x.url, x.permission]) );
+      const permission_type = Object.fromEntries(permissionList.filter((x) => x.url && x.permission).map((x) => [x.url, x.permission]));
 
       const payload = {
         name: name.trim(),
         path: path.trim(),
         component: component.trim(),
         active,
-        canViewBy: canViewBy ? ["sysadmin"] : ["sysadmin", "owner"],
+        is_public: isPublic, 
+  canViewBy: isPublic ? [] : (canViewBy ? ["sysadmin"] : ["sysadmin", "owner"]),
         permission_type,
       };
 
@@ -293,23 +298,45 @@ export default function AddPageAdminScreen() {
           )}
         </View>
 
+        {/* PUBLIC STATUS */}
+        <View style={{ marginTop: 20 }}>
+          <Text style={{ fontWeight: "700", marginBottom: 10 }}>
+            Halaman Publik ?
+          </Text>
+
+          <View style={{ flexDirection: "row", alignItems: "center" }}>
+            <IOSSwitch value={isPublic} onChange={setIsPublic} />
+            <Text style={{ marginLeft: 10, fontSize: 15, fontWeight: "600" }}>
+              {isPublic ? "Ya" : "Tidak"}
+            </Text>
+          </View>
+
+          {errors.isPublic && (
+            <Text style={{ color: "red", marginTop: 6 }}>{errors.isPublic}</Text>
+          )}
+        </View>
+
+
 
 
         {/* SYSADMIN */}
-        <Text style={{ marginTop: 20, fontWeight: "700" }}>
-          Hanya bisa dilihat dan diedit sysadmin
-        </Text>
+        {!isPublic && (
+          <>
+            <Text style={{ marginTop: 20, fontWeight: "700" }}>
+              Hanya bisa dilihat dan diedit sysadmin
+            </Text>
 
-        <View style={{ marginTop: 12, flexDirection: "row", alignItems: "center", gap: 12 }}>
-          <IOSSwitch value={canViewBy} onChange={setcanViewBy} />
+            <View style={{ marginTop: 12, flexDirection: "row", alignItems: "center", gap: 12 }}>
+              <IOSSwitch value={canViewBy} onChange={setcanViewBy} />
+              <Text style={{ fontSize: 15, fontWeight: "600" }}>
+                {canViewBy ? "Ya" : "Tidak"}
+              </Text>
+            </View>
 
-          <Text style={{ fontSize: 15, fontWeight: "600" }}>
-            {canViewBy ? "Ya" : "Tidak"}
-          </Text>
-        </View>
-
-        {errors.canViewBy && (
-          <Text style={{ color: "red", marginTop: 6 }}>{errors.canViewBy}</Text>
+            {errors.canViewBy && (
+              <Text style={{ color: "red", marginTop: 6 }}>{errors.canViewBy}</Text>
+            )}
+          </>
         )}
 
 

@@ -73,12 +73,13 @@ export interface PermissionItem {
 // =============================
 // 🔹 GET BY ID (untuk EDIT / preload)
 // =============================
-export const getAksesPenggunaById = async (roleId: string, path: string) => {
+export const getAksesPenggunaById = async (roleId: string, rootPath: string, basePath: string) => {
   //const normalizedPath = pagePath;
   const res = await api.get("/getAksesPenggunaById", {
     params: {
       roleId,
-      path
+      rootPath,
+      basePath
     }
   });
 

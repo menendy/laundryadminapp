@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { View, ScrollView, Text, Pressable, Platform } from "react-native";
+import { View, ScrollView, Text, Pressable, Platform, Animated, TouchableOpacity } from "react-native";
 import { Button, Chip, Portal } from "react-native-paper";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function EditPageAdminScreen() {
   const { id } = useLocalSearchParams();
+  const pageId = Array.isArray(id) ? id[0] : id;
   const router = useRouter();
   const showSnackbar = useSnackbarStore((s) => s.showSnackbar);
   const insets = useSafeAreaInsets();
@@ -25,6 +26,7 @@ export default function EditPageAdminScreen() {
   const [component, setComponent] = useState("");
 
   const [active, setActive] = useState(true);
+  const [isPublic, setIsPublic] = useState<boolean>(true);
   const [canViewBy, setcanViewBy] = useState<boolean>(true);
 
   const [permissionList, setPermissionList] = useState<any[]>([]);
@@ -35,14 +37,42 @@ export default function EditPageAdminScreen() {
 
   const [prevPath, setPrevPath] = useState("");
 
-  const defaultPermissionTemplates = [
-    { id: "read", suffix: "", permission: "baca" },
-    { id: "add", suffix: "add", permission: "tambah" },
-    { id: "edit", suffix: "edit", permission: "ubah" },
-    { id: "delete", suffix: "delete", permission: "hapus" },
-  ];
 
-  // Load existing data
+  const logPermissionDiff = () => {
+    const toInsert = permissionList.filter(x => !x.originalUrl && !x.isDeleted);
+    const toUpdate = permissionList.filter(x => x.originalUrl && x.isEdited && !x.isDeleted);
+    const toDelete = permissionList.filter(x => x.originalUrl && x.isDeleted);
+
+    console.group("🔍 Permission Diff (Modal Closed)");
+
+    console.log("✨ NEW / Insert:");
+    console.table(toInsert.map(x => ({ url: x.url, permission: x.permission })));
+
+    console.log("✏️ UPDATED / Edited:");
+    console.table(toUpdate.map(x => ({
+      oldUrl: x.originalUrl,
+      newUrl: x.url,
+      oldPerm: x.originalPermission,
+      newPerm: x.permission,
+    })));
+
+    console.log("🗑️ DELETED / Removed:");
+    console.table(toDelete.map(x => ({
+      removedUrl: x.originalUrl,
+      removedPerm: x.originalPermission,
+    })));
+
+    console.log("📌 CURRENT (Saved in Form State):");
+    console.table(
+      permissionList
+        .filter(x => !x.isDeleted)
+        .map(x => ({ url: x.url, permission: x.permission }))
+    );
+
+    console.groupEnd();
+  };
+
+
   useEffect(() => {
     loadDetail();
   }, [id]);
@@ -51,19 +81,32 @@ export default function EditPageAdminScreen() {
     setLoading(true);
     try {
       const res = await getPageAdminById(String(id));
-      const ok = handleBackendError(res, () => {}, showSnackbar);
+      const ok = handleBackendError(res, () => { }, showSnackbar);
       if (!ok) return;
 
       const d = res.data;
-      setName(d.name);
-      setPath(d.path);
-      setComponent(d.component);
-      setActive(d.active);
-      setcanViewBy(d.can_view_by?.includes("sysadmin"));
+
+      setName(d.name ?? "");
+      setPath(d.path ?? "");
+      setComponent(d.component ?? "");
+      setActive(d.active ?? true);
+
+      const canViewArr = Array.isArray(d.can_view_by) ? d.can_view_by : [];
+      const calculatedIsPublic = d.is_public !== undefined ? d.is_public : canViewArr.length === 0;
+      const calculatedCanViewBy = calculatedIsPublic ? true : !canViewArr.includes("owner");
+
+      setIsPublic(calculatedIsPublic);
+      setcanViewBy(calculatedCanViewBy);
+
+      // === PERMISSIONS LOAD ===
       setPermissionList(
         Object.entries(d.permissions_type || {}).map(([url, perm]: any) => ({
           url,
           permission: perm,
+          originalUrl: url,
+          originalPermission: perm,
+          isEdited: false,
+          isDeleted: false,
           isDefault: false,
           defaultId: null,
         }))
@@ -85,10 +128,13 @@ export default function EditPageAdminScreen() {
     if (path === prevPath) return;
 
     setPermissionList((prev) =>
-      prev.map((row) => ({
-        ...row,
-        url: replacePrefix(row.url, prevPath, path),
-      }))
+      prev.map((item) =>
+      ({
+        ...item,
+        url: replacePrefix(item.url, prevPath, path),
+        isEdited: true,
+      })
+      )
     );
 
     setPrevPath(path);
@@ -99,8 +145,8 @@ export default function EditPageAdminScreen() {
       {
         url: `${path}/`,
         permission: "",
-        isDefault: false,
-        defaultId: null,
+        isDeleted: false,
+        isEdited: true,
       },
       ...prev,
     ]);
@@ -108,7 +154,17 @@ export default function EditPageAdminScreen() {
 
   const updatePermission = (index: number, key: string, value: string) => {
     setPermissionList((prev) =>
-      prev.map((row, i) => (i === index ? { ...row, [key]: value } : row))
+      prev.map((row, i) =>
+        i === index ? { ...row, [key]: value, isEdited: true } : row
+      )
+    );
+  };
+
+  const markDeletePermission = (index: number) => {
+    setPermissionList((prev) =>
+      prev.map((item, i) =>
+        i === index ? { ...item, isDeleted: true } : item
+      )
     );
   };
 
@@ -121,7 +177,7 @@ export default function EditPageAdminScreen() {
 
     const permission_type = Object.fromEntries(
       permissionList
-        .filter((x) => x.url?.trim() && x.permission?.trim())
+        .filter((x) => !x.isDeleted && x.url?.trim() && x.permission?.trim())
         .map((x) => [x.url.trim(), x.permission.trim()])
     );
 
@@ -144,18 +200,51 @@ export default function EditPageAdminScreen() {
 
       const permission_type = Object.fromEntries(
         permissionList
-          .filter((x) => x.url && x.permission)
+          .filter((x) => !x.isDeleted && x.url && x.permission)
           .map((x) => [x.url, x.permission])
       );
 
+      const toInsert = permissionList
+        .filter((x) => !x.originalUrl && !x.isDeleted)
+        .map((x) => ({
+          originalUrl: null,
+          originalPermission: null,
+          url: x.url,
+          permission: x.permission,
+        }));
+
+      const toUpdate = permissionList
+        .filter((x) => x.originalUrl && x.isEdited && !x.isDeleted)
+        .map((x) => ({
+          originalUrl: x.originalUrl,
+          originalPermission: x.originalPermission,
+          url: x.url,
+          permission: x.permission,
+        }));
+
+      const toDelete = permissionList
+        .filter((x) => x.originalUrl && x.isDeleted)
+        .map((x) => ({
+          originalUrl: x.originalUrl,
+          originalPermission: x.originalPermission,
+          url: null,
+          permission: null,
+        }));
+
+
+
       const payload = {
-        id,
+        id:pageId,
         name: name.trim(),
         path: path.trim(),
         component: component.trim(),
         active,
-        canViewBy: canViewBy ? ["sysadmin"] : ["sysadmin", "owner"],
+        is_public: isPublic,
+        canViewBy: isPublic ? [] : (canViewBy ? ["sysadmin"] : ["sysadmin", "owner"]),
         permission_type,
+        sync_permissions_diff: {
+          update: toUpdate
+        }
       };
 
       const res = await updatePageAdmin(payload);
@@ -178,6 +267,51 @@ export default function EditPageAdminScreen() {
       </View>
     );
   }
+
+  const IOSSwitch = ({ value, onChange }: any) => {
+    const animated = React.useRef(new Animated.Value(value ? 1 : 0)).current;
+
+    React.useEffect(() => {
+      Animated.timing(animated, {
+        toValue: value ? 1 : 0,
+        duration: 180,
+        useNativeDriver: false,
+      }).start();
+    }, [value]);
+
+    const translate = animated.interpolate({
+      inputRange: [0, 1],
+      outputRange: [2, 22],
+    });
+
+    return (
+      <TouchableOpacity
+        activeOpacity={0.9}
+        onPress={() => onChange(!value)}
+        style={{
+          width: 46,
+          height: 28,
+          borderRadius: 20,
+          justifyContent: "center",
+          padding: 2,
+          backgroundColor: value ? "#34C759" : "#E5E5EA",
+        }}
+      >
+        <Animated.View
+          style={{
+            width: 24,
+            height: 24,
+            borderRadius: 12,
+            backgroundColor: "#fff",
+            shadowColor: "#000",
+            shadowOpacity: 0.2,
+            shadowRadius: 2,
+            transform: [{ translateX: translate }],
+          }}
+        />
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <View style={{ flex: 1, backgroundColor: "#f9f9f9" }}>
@@ -209,48 +343,49 @@ export default function EditPageAdminScreen() {
         />
 
         {/* STATUS */}
-        <Text style={{ marginTop: 20, fontWeight: "700" }}>Status Halaman</Text>
-        <View style={{ flexDirection: "row", gap: 10, marginTop: 10 }}>
-          <Chip selected={active} onPress={() => setActive(true)}>
-            Aktif
-          </Chip>
-          <Chip selected={!active} onPress={() => setActive(false)}>
-            Nonaktif
-          </Chip>
+        <View style={{ marginTop: 20 }}>
+          <Text style={{ fontWeight: "700", marginBottom: 10 }}>
+            Status Halaman
+          </Text>
+
+          <View style={{ flexDirection: "row", alignItems: "center" }}>
+            <IOSSwitch value={active} onChange={setActive} />
+            <Text style={{ marginLeft: 10, fontSize: 15, fontWeight: "600" }}>
+              {active ? "Aktif" : "Nonaktif"}
+            </Text>
+          </View>
+        </View>
+
+        {/* HALAMAN PUBLIK */}
+        <View style={{ marginTop: 20 }}>
+          <Text style={{ fontWeight: "700", marginBottom: 10 }}>
+            Halaman Publik ?
+          </Text>
+
+          <View style={{ flexDirection: "row", alignItems: "center" }}>
+            <IOSSwitch value={isPublic} onChange={setIsPublic} />
+            <Text style={{ marginLeft: 10, fontSize: 15, fontWeight: "600" }}>
+              {isPublic ? "Ya" : "Tidak"}
+            </Text>
+          </View>
         </View>
 
         {/* SYSADMIN */}
-        <Text style={{ marginTop: 20, fontWeight: "700" }}>
-          Hanya bisa dilihat sysadmin?
-        </Text>
+        {!isPublic && (
+          <>
+            <Text style={{ marginTop: 20, fontWeight: "700" }}>
+              Hanya bisa dilihat dan diedit sysadmin
+            </Text>
 
-        <View style={{ marginTop: 12, gap: 12 }}>
-          <Pressable
-            onPress={() => setcanViewBy(true)}
-            style={{ flexDirection: "row", alignItems: "center", gap: 10 }}
-          >
-            <Ionicons
-              name={canViewBy ? "radio-button-on" : "radio-button-off"}
-              size={22}
-              color={canViewBy ? "#007aff" : "#777"}
-            />
-            <Text>Ya</Text>
-          </Pressable>
+            <View style={{ marginTop: 12, flexDirection: "row", alignItems: "center", gap: 12 }}>
+              <IOSSwitch value={canViewBy} onChange={setcanViewBy} />
+              <Text style={{ fontSize: 15, fontWeight: "600" }}>
+                {canViewBy ? "Ya" : "Tidak"}
+              </Text>
+            </View>
+          </>
+        )}
 
-          <Pressable
-            onPress={() => setcanViewBy(false)}
-            style={{ flexDirection: "row", alignItems: "center", gap: 10 }}
-          >
-            <Ionicons
-              name={!canViewBy ? "radio-button-on" : "radio-button-off"}
-              size={22}
-              color={!canViewBy ? "#007aff" : "#777"}
-            />
-            <Text>Tidak</Text>
-          </Pressable>
-        </View>
-
-        {/* PERMISSION MODAL TRIGGER */}
         <Pressable
           onPress={() => setPermissionModalVisible(true)}
           style={{
@@ -271,14 +406,13 @@ export default function EditPageAdminScreen() {
           mode="contained"
           onPress={handleUpdate}
           loading={loading}
-          disabled={loading}
           style={{ marginTop: 30 }}
         >
-          {loading ? "Menyimpan..." : "Update Halaman"}
+          Update Halaman
         </Button>
       </ScrollView>
 
-      {/* ============= Permission Modal ============= */}
+      {/* PERMISSION MODAL */}
       <Portal>
         {permissionModalVisible && (
           <View
@@ -293,38 +427,45 @@ export default function EditPageAdminScreen() {
               zIndex: 9999,
             }}
           >
-            <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 160 }}>
+            <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 180 }}>
               <Button mode="contained" onPress={addPermissionRow}>
                 Tambah tipe
               </Button>
 
-              {permissionList.map((row, idx) => (
-                <View
-                  key={idx}
-                  style={{
-                    marginTop: 20,
-                    backgroundColor: "#fafafa",
-                    padding: 12,
-                    borderRadius: 8,
-                  }}
-                >
-                  <Text style={{ fontWeight: "600" }}>Url</Text>
-                  <ValidatedInput
-                    value={row.url}
-                    onChangeText={(v) => updatePermission(idx, "url", v)}
-                  />
+              {permissionList
+                .filter((i) => !i.isDeleted)
+                .map((row, idx) => (
+                  <View
+                    key={idx}
+                    style={{
+                      marginTop: 20,
+                      backgroundColor: "#fafafa",
+                      padding: 12,
+                      borderRadius: 8,
+                      borderWidth: row.isEdited ? 1.5 : 1,
+                      borderColor: row.isEdited ? "#007aff" : "#ddd",
+                    }}
+                  >
+                    <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                      <Text style={{ fontWeight: "600" }}>Permission #{idx + 1}</Text>
+                      <Pressable onPress={() => markDeletePermission(idx)}>
+                        <Ionicons name="trash-outline" size={22} color="#cc0000" />
+                      </Pressable>
+                    </View>
 
-                  <Text style={{ marginTop: 10, fontWeight: "600" }}>
-                    Permission
-                  </Text>
-                  <ValidatedInput
-                    value={row.permission}
-                    onChangeText={(v) =>
-                      updatePermission(idx, "permission", v)
-                    }
-                  />
-                </View>
-              ))}
+                    <Text style={{ fontWeight: "600", marginTop: 10 }}>Url</Text>
+                    <ValidatedInput
+                      value={row.url}
+                      onChangeText={(v) => updatePermission(idx, "url", v)}
+                    />
+
+                    <Text style={{ fontWeight: "600", marginTop: 10 }}>Permission</Text>
+                    <ValidatedInput
+                      value={row.permission}
+                      onChangeText={(v) => updatePermission(idx, "permission", v)}
+                    />
+                  </View>
+                ))}
             </ScrollView>
 
             <View
@@ -340,9 +481,16 @@ export default function EditPageAdminScreen() {
                 borderColor: "#ddd",
               }}
             >
-              <Button mode="contained" onPress={() => setPermissionModalVisible(false)}>
+              <Button
+                mode="contained"
+                onPress={() => {
+                  setPermissionModalVisible(false);
+                  logPermissionDiff(); // 👈 TAMBAHKAN INI
+                }}
+              >
                 Simpan & Tutup
               </Button>
+
             </View>
           </View>
         )}
