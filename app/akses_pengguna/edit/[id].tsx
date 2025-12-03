@@ -15,6 +15,7 @@ import { useSnackbarStore } from "../../../store/useSnackbarStore";
 import { handleBackendError } from "../../../utils/handleBackendError";
 import { useRolePermissionStore } from "../../../store/useRolePermissionStore";
 import { useBasePath } from "../../../utils/useBasePath";
+import ToggleSwitch from "../../../components/ui/ToggleSwitch";
 
 
 
@@ -30,6 +31,7 @@ export default function EditAksesPenggunaScreen() {
 
   const [name, setName] = useState("");
   const [desc, setDesc] = useState("");
+  const [active, setActive] = useState(true);
   const [appAccess, setAppAccess] = useState<string[]>([]);
   const [errors, setErrors] = useState<any>({});
   const [loading, setLoading] = useState(false);
@@ -54,6 +56,7 @@ useEffect(() => {
       setName(data.name ?? "");
       setDesc(data.description ?? "");
       setAppAccess(data.app_access ?? []);
+      setActive(data.active);
 
       const permsArray: PermissionItem[] = data.permissions ?? [];
       const mapped: Record<string, string[]> = {};
@@ -85,7 +88,7 @@ useEffect(() => {
 
   const validate = () => {
     const e: any = {};
-    if (!name.trim()) e.name = "Nama role wajib diisi";
+    if (!name.trim()) e.name = "Nama akses wajib diisi";
     if (!desc.trim()) e.desc = "Deskripsi wajib diisi";
     if (appAccess.length === 0) e.access = "Pilih minimal 1 access";
     setErrors(e);
@@ -113,6 +116,7 @@ useEffect(() => {
         name: name.trim(),
         description: desc.trim(),
         appAccess,
+        active,
         permissions: formattedPermissions,
       };
 
@@ -145,7 +149,7 @@ useEffect(() => {
 
       <ScrollView contentContainerStyle={{ padding: 20 }}>
         <ValidatedInput
-          label="Nama Role"
+          label="Nama Akses"
           required
           placeholder="Supervisor, Kasir, Admin..."
           value={name}
@@ -156,11 +160,26 @@ useEffect(() => {
         <ValidatedInput
           label="Deskripsi"
           required
-          placeholder="Deskripsi role"
+          placeholder="Deskripsi Akses"
           value={desc}
           onChangeText={setDesc}
           error={errors.desc}
         />
+
+     {/* STATUS */}
+            <View style={{ marginTop: 20 }}>
+              <Text style={{ fontWeight: "700", marginBottom: 10 }}>
+                Status Halaman
+              </Text>
+    
+              <View style={{ flexDirection: "row", alignItems: "center" }}>
+                <ToggleSwitch value={active} onChange={setActive} />
+                <Text style={{ marginLeft: 10, fontSize: 15, fontWeight: "600" }}>
+                  {active ? "Aktif" : "Nonaktif"}
+                </Text>
+              </View>
+            </View>
+    
 
         <Text style={{ marginTop: 20, marginBottom: 10, fontWeight: "600" }}>
           App Access

@@ -10,6 +10,7 @@ import { addPageAdmin } from "../../services/api/pagesAdminService";
 import { useSnackbarStore } from "../../store/useSnackbarStore";
 import { handleBackendError } from "../../utils/handleBackendError";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import ToggleSwitch from "../../components/ui/ToggleSwitch";
 
 
 
@@ -184,7 +185,7 @@ export default function AddPageAdminScreen() {
       if (!ok) return;
 
       showSnackbar("Halaman berhasil ditambahkan", "success");
-      //router.back();
+      router.back();
 
     } catch (err) {
       console.error("🔥 Error addPageAdmin:", err);
@@ -287,7 +288,7 @@ export default function AddPageAdminScreen() {
           </Text>
 
           <View style={{ flexDirection: "row", alignItems: "center" }}>
-            <IOSSwitch value={active} onChange={setActive} />
+            <ToggleSwitch value={active} onChange={setActive} />
             <Text style={{ marginLeft: 10, fontSize: 15, fontWeight: "600" }}>
               {active ? "Aktif" : "Nonaktif"}
             </Text>
@@ -305,7 +306,7 @@ export default function AddPageAdminScreen() {
           </Text>
 
           <View style={{ flexDirection: "row", alignItems: "center" }}>
-            <IOSSwitch value={isPublic} onChange={setIsPublic} />
+            <ToggleSwitch value={isPublic} onChange={setIsPublic} />
             <Text style={{ marginLeft: 10, fontSize: 15, fontWeight: "600" }}>
               {isPublic ? "Ya" : "Tidak"}
             </Text>
@@ -327,7 +328,7 @@ export default function AddPageAdminScreen() {
             </Text>
 
             <View style={{ marginTop: 12, flexDirection: "row", alignItems: "center", gap: 12 }}>
-              <IOSSwitch value={canViewBy} onChange={setcanViewBy} />
+              <ToggleSwitch value={canViewBy} onChange={setcanViewBy} />
               <Text style={{ fontSize: 15, fontWeight: "600" }}>
                 {canViewBy ? "Ya" : "Tidak"}
               </Text>

@@ -13,6 +13,7 @@ import {
 import { useSnackbarStore } from "../../../store/useSnackbarStore";
 import { handleBackendError } from "../../../utils/handleBackendError";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import ToggleSwitch from "../../../components/ui/ToggleSwitch";
 
 export default function EditPageAdminScreen() {
   const { id } = useLocalSearchParams();
@@ -268,50 +269,6 @@ export default function EditPageAdminScreen() {
     );
   }
 
-  const IOSSwitch = ({ value, onChange }: any) => {
-    const animated = React.useRef(new Animated.Value(value ? 1 : 0)).current;
-
-    React.useEffect(() => {
-      Animated.timing(animated, {
-        toValue: value ? 1 : 0,
-        duration: 180,
-        useNativeDriver: false,
-      }).start();
-    }, [value]);
-
-    const translate = animated.interpolate({
-      inputRange: [0, 1],
-      outputRange: [2, 22],
-    });
-
-    return (
-      <TouchableOpacity
-        activeOpacity={0.9}
-        onPress={() => onChange(!value)}
-        style={{
-          width: 46,
-          height: 28,
-          borderRadius: 20,
-          justifyContent: "center",
-          padding: 2,
-          backgroundColor: value ? "#34C759" : "#E5E5EA",
-        }}
-      >
-        <Animated.View
-          style={{
-            width: 24,
-            height: 24,
-            borderRadius: 12,
-            backgroundColor: "#fff",
-            shadowColor: "#000",
-            shadowOpacity: 0.2,
-            shadowRadius: 2,
-            transform: [{ translateX: translate }],
-          }}
-        />
-      </TouchableOpacity>
-    );
-  };
 
   return (
     <View style={{ flex: 1, backgroundColor: "#f9f9f9" }}>
@@ -349,7 +306,7 @@ export default function EditPageAdminScreen() {
           </Text>
 
           <View style={{ flexDirection: "row", alignItems: "center" }}>
-            <IOSSwitch value={active} onChange={setActive} />
+            <ToggleSwitch value={active} onChange={setActive} />
             <Text style={{ marginLeft: 10, fontSize: 15, fontWeight: "600" }}>
               {active ? "Aktif" : "Nonaktif"}
             </Text>
@@ -363,7 +320,7 @@ export default function EditPageAdminScreen() {
           </Text>
 
           <View style={{ flexDirection: "row", alignItems: "center" }}>
-            <IOSSwitch value={isPublic} onChange={setIsPublic} />
+            <ToggleSwitch value={isPublic} onChange={setIsPublic} />
             <Text style={{ marginLeft: 10, fontSize: 15, fontWeight: "600" }}>
               {isPublic ? "Ya" : "Tidak"}
             </Text>
@@ -378,7 +335,7 @@ export default function EditPageAdminScreen() {
             </Text>
 
             <View style={{ marginTop: 12, flexDirection: "row", alignItems: "center", gap: 12 }}>
-              <IOSSwitch value={canViewBy} onChange={setcanViewBy} />
+              <ToggleSwitch value={canViewBy} onChange={setcanViewBy} />
               <Text style={{ fontSize: 15, fontWeight: "600" }}>
                 {canViewBy ? "Ya" : "Tidak"}
               </Text>

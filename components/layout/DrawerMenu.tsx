@@ -31,6 +31,7 @@ const MENU_JSON: MenuItem[] = [
   { key: "profil", label: "Profil Akun", icon: "account-circle", path: "/profil" },
   { key: "karyawan", label: "Karyawan", icon: "account-group", path: "/karyawan" },
   { key: "akses_pengguna", label: "Akses Pengguna", icon: "account-group", path: "/akses_pengguna" },
+  { key: "sysadmin", label: "Pengaturan Sysadmin", icon: "account-group", path: "/sysadmin" },
 
   {
     key: "pengaturanAkses",
@@ -51,10 +52,10 @@ const MENU_JSON: MenuItem[] = [
         ],
       },
 
-      { key: "role", label: "Role", icon: "account-group-outline", path: "roles" },
+     
       { key: "page_admin", label: "Akses Admin", icon: "account-group-outline", path: "pages_admin" },
       { key: "page_operational", label: "Akses operasional", icon: "account-group-outline", path: "pages_operational" },
-      { key: "access", label: "Akses", icon: "account-group-outline", path: "access" },
+     
     ],
   },
 ];

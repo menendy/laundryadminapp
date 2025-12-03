@@ -1,25 +1,26 @@
-import React, { memo } from "react";
+import React, { memo, useState } from "react";
 import {
-  View, FlatList, RefreshControl, Keyboard, Text,
-  ToastAndroid, Platform, Pressable
+  View,
+  FlatList,
+  RefreshControl,
+  Keyboard,
+  Text, Pressable, Platform,ToastAndroid
 } from "react-native";
-import { Card, List, ActivityIndicator } from "react-native-paper";
-import Clipboard from "@react-native-clipboard/clipboard";
-
-import Animated, { ZoomIn, ZoomOut } from "react-native-reanimated";
-
-import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { Card, List, Button, ActivityIndicator } from "react-native-paper";
 import { useRouter } from "expo-router";
 
+import Clipboard from "@react-native-clipboard/clipboard";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 
-import { getAksesAdminList } from "../../services/api/aksesPenggunaService";
+import Animated, { ZoomIn, ZoomOut } from "react-native-reanimated";
+import { getSysadminList } from "../../services/api/sysadminService";
 import AppHeaderList from "../../components/ui/AppHeaderList";
 import AppSearchBarBottomSheet from "../../components/ui/AppSearchBarBottomSheet";
 import { useUniversalPaginatedList } from "../../hooks/UniversalPaginatedList";
 import { useBasePath } from "../../utils/useBasePath";
 
 /* CARD */
-const AksesPenggunaItem = memo(({ item, activeMenuId, onOpenMenu, onCloseMenu, onView, onEdit }: any) => {
+const PageAdminItem = memo(({ item, activeMenuId, onOpenMenu, onCloseMenu, onView, onEdit }: any) => {
 
   const copyId = () => {
     Clipboard.setString(item.id);
@@ -45,39 +46,40 @@ const AksesPenggunaItem = memo(({ item, activeMenuId, onOpenMenu, onCloseMenu, o
       <List.Item
         title={item.name}
         titleStyle={{ marginBottom: 6, fontWeight: "bold", fontSize: 17 }}
-        description={() => (
-          <View style={{ marginTop: 4 }}>
+        description={
+          <>
+            <View style={{ marginTop: 4 }}>
+              {/* email */}
+              <View style={{ flexDirection: "row", marginBottom: 2 }}>
+                
+                <Text style={{ fontSize: 14 }}>
+                {item.email}
+                </Text>
+              </View>
 
-            {/* Status Aktif / Nonaktif */}
-            <View style={{ flexDirection: "row", marginBottom: 2 }}>
-              <Text
-                style={{
-                  fontSize: 14,
-                  color: item.active ? "green" : "red",
-                  fontWeight: "600"
-                }}
-              >
-                {item.active ? "Aktif" : "Nonaktif"}
-              </Text>
+              {/* Status */}
+              <View style={{ flexDirection: "row", marginBottom: 2 }}>
+
+                <Text style={{ fontSize: 14, color: item.active ? "green" : "red", fontWeight: "600" }}>
+                  {item.active ? "Aktif" : "Tidak Aktif"}
+                </Text>
+              </View>
+
+
+              {/* Copy ID */}
+              <View style={{ flexDirection: "row", alignItems: "center" }}>
+                <Text style={{ fontSize: 12, color: "#666", marginRight: 8 }}>
+                  {item.id}
+                </Text>
+                <Pressable onPress={copyId}>
+                  <MaterialCommunityIcons name="content-copy" size={18} color="#666" style={{ marginTop: -3, marginLeft: -5 }} />
+                </Pressable>
+              </View>
+
             </View>
 
-            {/* Copy ID */}
-            <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <Text style={{ fontSize: 12, color: "#666", marginRight: 8 }}>
-                {item.id}
-              </Text>
-              <Pressable onPress={copyId}>
-                <MaterialCommunityIcons
-                  name="content-copy"
-                  size={18}
-                  color="#666"
-                  style={{ marginTop: -3, marginLeft: -5 }}
-                />
-              </Pressable>
-            </View>
-
-          </View>
-        )}
+          </>
+        }
         descriptionNumberOfLines={6}
         right={() => (
           <Pressable onPress={onOpenMenu} style={{ paddingHorizontal: 3 }}>
@@ -85,7 +87,6 @@ const AksesPenggunaItem = memo(({ item, activeMenuId, onOpenMenu, onCloseMenu, o
           </Pressable>
         )}
       />
-
 
       {/* Popup */}
       {isMenuVisible && (
@@ -169,53 +170,50 @@ const AksesPenggunaItem = memo(({ item, activeMenuId, onOpenMenu, onCloseMenu, o
 
 });
 
-
-export default function AksesPenggunaListScreen() {
+export default function SysadminListScreen() {
   const router = useRouter();
-  
-
   const { rootBase: rootPath, basePath } = useBasePath();
-  
+
   const list = useUniversalPaginatedList({
     rootPath,
     basePath,
-    fetchFn: getAksesAdminList,
+    fetchFn: getSysadminList,
     defaultMode: "semua",
   });
 
-  const [activeMenuId, setActiveMenuId] = React.useState<string | null>(null);
+   const [activeMenuId, setActiveMenuId] = React.useState<string | null>(null);
 
-  const renderItem = ({ item }: any) => (
-    <AksesPenggunaItem
+    const renderItem = ({ item }: any) => (
+    <PageAdminItem
       item={item}
       activeMenuId={activeMenuId}
       onOpenMenu={() => setActiveMenuId(item.id)}
       onCloseMenu={() => setActiveMenuId(null)}
       onView={(i: any) => {
         setActiveMenuId(null);
-        router.push(`/akses_pengguna/${i.id}`);
+        router.push(`/sysadmin/${i.id}`);
       }}
       onEdit={(i: any) => {
         setActiveMenuId(null);
-        router.push(`/akses_pengguna/edit/${i.id}`);
+        router.push(`/sysadmin/edit/${i.id}`);
       }}
     />
   );
 
   return (
     <View style={{ flex: 1, backgroundColor: "#f9f9f9" }}>
-      <AppHeaderList title="Pengaturan Akses Pengguna" onAdd={() => router.push("/akses_pengguna/add")} />
+      <AppHeaderList title="Data Sysadmin" onAdd={() => router.push("/sysadmin/add")} />
 
       <AppSearchBarBottomSheet
         value={list.search}
         onChangeText={list.setSearch}
         mode={list.mode}
         onChangeMode={(m) => list.setMode(m)}
-        placeholder="Cari nama..."
+        placeholder="Cari nama / telp..."
         categories={[
           { label: "Semua", value: "semua" },
-          { label: "Nama", value: "name" },
-
+          { label: "Nama", value: "nama" },
+          { label: "Telepon", value: "telp" },
         ]}
         defaultMode="semua"
       />
@@ -227,9 +225,6 @@ export default function AksesPenggunaListScreen() {
       )}
 
       <FlatList
-        style={{ flex: 1 }}
-        contentContainerStyle={{ paddingBottom: 100 }}
-        scrollEnabled={true}
         data={list.items}
         keyExtractor={(i) => i.id}
         renderItem={renderItem}
@@ -240,8 +235,8 @@ export default function AksesPenggunaListScreen() {
         onEndReached={list.onEndReached}
         ListEmptyComponent={
           !list.loading ? (
-            <Text style={{ textAlign: "center", marginTop: 20, color: "#777" }}>
-              Belum ada data
+            <Text style={{ textAlign: "center", marginTop: 20 }}>
+              Belum ada data Sysadmin.
             </Text>
           ) : null
         }

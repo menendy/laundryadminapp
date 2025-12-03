@@ -1,4 +1,4 @@
-// hooks/UniversalPaginatedList.ts (FINAL FIX + SNACKBAR WORKING)
+// hooks/UniversalPaginatedList.ts (FULL FIX 403 LOOP)
 
 import React, {
   useState,
@@ -6,6 +6,7 @@ import React, {
   useRef,
   useCallback,
 } from "react";
+import { useFocusEffect } from "expo-router";
 import { useSnackbarStore } from "../store/useSnackbarStore";
 import { handleBackendError } from "../utils/handleBackendError";
 
@@ -15,13 +16,13 @@ export type FetchResult<T> = {
 };
 
 export interface UniversalPaginatedOptions<T, M extends string> {
-  modul: string;
-  pathname: string;
+  rootPath: string;
+  basePath: string;
   limit?: number;
   defaultMode: M;
   fetchFn: (
-    modul: string,
-    pathname: string,
+    rootPath: string,
+    basePath: string,
     search: string | null,
     cursor: string | null,
     limit: number,
@@ -30,8 +31,8 @@ export interface UniversalPaginatedOptions<T, M extends string> {
 }
 
 export function useUniversalPaginatedList<T, M extends string>({
-  modul,
-  pathname,
+  rootPath,
+  basePath,
   limit = 10,
   defaultMode,
   fetchFn,
@@ -48,18 +49,10 @@ export function useUniversalPaginatedList<T, M extends string>({
   const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState(false);
 
-  const didInitialLoad = useRef(false);
+  const focusedRef = useRef(false);
   const fetchLock = useRef(false);
-  const endReachedLock = useRef(true);
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastThrottleTime = useRef(0);
-  const isMounted = useRef(true);
-
-  useEffect(() => {
-    return () => {
-      isMounted.current = false;
-    };
-  }, []);
 
   const safeFetch = useCallback(
     async (
@@ -67,123 +60,127 @@ export function useUniversalPaginatedList<T, M extends string>({
       passedSearch: string = "",
       passedCursor: string | null = null
     ) => {
+      if (fetchLock.current) return;
+      if (!focusedRef.current) return;
       if (error) return;
-      if (fetchLock.current || !isMounted.current) return;
 
       fetchLock.current = true;
       setLoading(true);
 
       try {
         const result = await fetchFn(
-          modul,
-          pathname,
+          rootPath,
+          basePath,
           passedSearch?.trim() || null,
           reset ? null : passedCursor,
           limit,
           mode
         );
 
-        if (!isMounted.current) return;
+        const ok = handleBackendError(result as any, () => {}, showSnackbar);
 
-        const ok = handleBackendError(result as any, () => { }, showSnackbar);
         if (!ok) {
+          const r: any = result;
           setError(true);
           setHasMore(false);
-          setRefreshing(false);
+
+          // ⛔ Stop full pagination jika 403 ACCESS DENIED
+          if (r?.status === 403) {
+            fetchLock.current = true;
+            setItems([]); // Kosongkan supaya user tau tidak ada akses
+          }
+
           return;
         }
 
         const data = result.data ?? [];
 
-        setItems((prev) => {
-          const merged = reset ? data : [...prev, ...data];
-          const map = new Map(
-            merged.map((i: any) => [
-              i.id || i._id || Math.random().toString(),
-              i,
-            ])
-          );
-          return [...map.values()] as T[];
-        });
-
+        setItems((prev) => (reset ? data : [...prev, ...data]));
         setCursor(result.nextCursor ?? null);
         setHasMore(!!result.nextCursor);
+
       } catch (err: any) {
         setError(true);
+        setHasMore(false);
 
-        // Ambil pesan API jika tersedia
-        const apiMessage =
+        showSnackbar(
           err?.response?.data?.message ||
-          err?.message ||
-          "Gagal memuat data dari server";
+            err?.message ||
+            "Gagal memuat data dari server",
+          "error"
+        );
 
-          showSnackbar(apiMessage, "error");
-          setHasMore(false);
       } finally {
-        fetchLock.current = false;
-        if (isMounted.current) setLoading(false);
+        setLoading(false);
+
+        // Jika bukan 403 → allow fetch ulang lagi
+        if (!(error && fetchLock.current)) {
+          fetchLock.current = false;
+        }
       }
     },
-    [modul, pathname, mode, limit, fetchFn, showSnackbar, error]
+    [rootPath, basePath, mode, limit, fetchFn, showSnackbar, error]
   );
 
-  // Initial Load
+  // 📌 Load saat screen FOCUS pertama kali — TAPI hanya jika tidak error
+  useFocusEffect(
+    useCallback(() => {
+      focusedRef.current = true;
+
+      if (!error && items.length === 0 && !loading && search.trim() === "") {
+        setCursor(null);
+        safeFetch(true, "", null);
+      }
+
+      return () => {
+        focusedRef.current = false;
+      };
+    }, [items.length, loading, search, safeFetch, error])
+  );
+
+  // 🔎 Search — TAPI hanya jika tidak error
   useEffect(() => {
-    if (error) return;
-    if (didInitialLoad.current) return;
-
-    didInitialLoad.current = true;
-    safeFetch(true, search, null);
-
-    setTimeout(() => {
-      endReachedLock.current = false;
-    }, 300);
-  }, [error]);
-
-  // Debounce Search
-  useEffect(() => {
-    if (!didInitialLoad.current || error) return;
-
+    if (!focusedRef.current || error) return;
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
+
     debounceTimer.current = setTimeout(() => {
       setCursor(null);
       safeFetch(true, search, null);
-    }, 450);
+    }, 400);
 
     return () => {
       if (debounceTimer.current) clearTimeout(debounceTimer.current);
     };
-  }, [search, safeFetch]);
+  }, [search, safeFetch, error]);
 
-  // Mode Change
+  // 🔄 Mode change — TAPI tidak override search atau error
   useEffect(() => {
-    if (!didInitialLoad.current || error) return;
-    setCursor(null);
-    safeFetch(true, search, null);
-  }, [mode]);
+    if (!focusedRef.current || error) return;
+    if (search.trim() !== "") return;
 
-  // Refresh
+    setCursor(null);
+    safeFetch(true, "", null);
+  }, [mode, search, safeFetch, error]);
+
+  // 🔁 Manual refresh only
   const onRefresh = async () => {
-    setError(false);
+    if (!focusedRef.current || error) return;
     setRefreshing(true);
-    endReachedLock.current = true;
     setCursor(null);
 
     await safeFetch(true, search, null);
 
-    setTimeout(() => {
-      endReachedLock.current = false;
-      setRefreshing(false);
-    }, 200);
+    setRefreshing(false);
   };
 
-  // Pagination
   const onEndReached = async () => {
+    if (!focusedRef.current || loading || error) return;
+
     const now = Date.now();
     if (now - lastThrottleTime.current < 700) return;
     lastThrottleTime.current = now;
 
-    if (!hasMore || loading || error || endReachedLock.current) return;
+    if (!hasMore) return;
 
     await safeFetch(false, search, cursor);
   };

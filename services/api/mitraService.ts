@@ -15,8 +15,8 @@ export interface MitraListResponse {
 }
 
 export const getMitraList = async (
-  modul: string,                   
-  pagePath: string,                    
+  rootPath: string,                   
+  basePath: string,                    
   search: string | null = null,
   cursor: string | null = null,
   limit = 10,
@@ -25,8 +25,8 @@ export const getMitraList = async (
   try {
     const params = new URLSearchParams();
 
-    params.append("modul", modul);
-    params.append("path", pagePath);
+    params.append("rootPath", rootPath);
+    params.append("basePath", basePath);
 
     if (search) params.append("search", search);
     if (cursor) params.append("cursor", cursor);

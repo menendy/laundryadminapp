@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { View, ScrollView, Text, Pressable } from "react-native";
 import { Button, Chip } from "react-native-paper";
 import { useRouter,usePathname } from "expo-router";
@@ -14,6 +14,12 @@ import { useRolePermissionStore } from "../../store/useRolePermissionStore";
 
 
 export default function AddAksesPenggunaScreen() {
+
+  const resetPermissions = useRolePermissionStore((s) => s.resetPermissions);
+
+    useEffect(() => {
+    resetPermissions(); // 🔥 Mulai fresh di mode ADD
+  }, []);
 
   const router = useRouter();
   const pathname = usePathname();
@@ -41,9 +47,9 @@ export default function AddAksesPenggunaScreen() {
     const e: any = {};
 
 
-    //if (!name.trim()) e.name = "Nama role wajib diisi";
-    //if (!desc.trim()) e.desc = "Deskripsi wajib diisi";
-    //if (appAccess.length === 0) e.access = "Pilih minimal 1 access";
+    if (!name.trim()) e.name = "Nama akses wajib diisi";
+    if (!desc.trim()) e.desc = "Deskripsi wajib diisi";
+    if (appAccess.length === 0) e.access = "Pilih minimal 1 access";
 
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -85,7 +91,8 @@ export default function AddAksesPenggunaScreen() {
       if (!ok) return;
 
       showSnackbar("Halaman berhasil ditambahkan", "success");
-      //router.back();
+      resetPermissions();
+      router.back();
 
     } catch (err) {
 
@@ -112,9 +119,9 @@ export default function AddAksesPenggunaScreen() {
       <ScrollView contentContainerStyle={{ padding: 20 }}>
 
 
-        <ValidatedInput label="Nama Role" required placeholder="Supervisor, Kasir, Admin..." value={name} onChangeText={setName} error={errors.name} />
+        <ValidatedInput label="Nama Akses" required placeholder="Supervisor, Kasir, Admin..." value={name} onChangeText={setName} error={errors.name} />
 
-        <ValidatedInput label="Deskripsi" required placeholder="Deskripsi role" value={desc} onChangeText={setDesc} error={errors.desc} />
+        <ValidatedInput label="Deskripsi" required placeholder="Deskripsi Akses" value={desc} onChangeText={setDesc} error={errors.desc} />
 
 
         <Text style={{ marginTop: 20, marginBottom: 10, fontWeight: "600", }} > App Access </Text>

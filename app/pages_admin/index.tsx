@@ -14,6 +14,9 @@ import { getPagesAdminList } from "../../services/api/pagesAdminService";
 import AppHeaderList from "../../components/ui/AppHeaderList";
 import AppSearchBarBottomSheet from "../../components/ui/AppSearchBarBottomSheet";
 import { useUniversalPaginatedList } from "../../hooks/UniversalPaginatedList";
+import { useBasePath } from "../../utils/useBasePath";
+
+
 
 /* CARD */
 const PageAdminItem = memo(({ item, activeMenuId, onOpenMenu, onCloseMenu, onView, onEdit }: any) => {
@@ -181,11 +184,13 @@ const PageAdminItem = memo(({ item, activeMenuId, onOpenMenu, onCloseMenu, onVie
 
 export default function PagesAdminListScreen() {
   const router = useRouter();
-  const pathname = usePathname();
+  //const pathname = usePathname();
+
+  const { rootBase: rootPath, basePath } = useBasePath();
 
   const list = useUniversalPaginatedList({
-    modul: "pages_admin",
-    pathname,
+    rootPath,
+    basePath,
     fetchFn: getPagesAdminList,
     defaultMode: "semua",
   });

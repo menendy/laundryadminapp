@@ -30,8 +30,5 @@ export const useRolePermissionStore = create<RolePermissionState>((set) => ({
     })),
 
   // Reset semua
-  resetPermissions: () =>
-    set(() => ({
-      permissions: {},
-    })),
+  resetPermissions: () => set(() => ({permissions: {},})),
 }));

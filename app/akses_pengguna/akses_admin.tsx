@@ -6,16 +6,19 @@ import AppHeaderActions from "../../components/ui/AppHeaderActions";
 import { getPagesAdminListAll, getAksesPenggunaById } from "../../services/api/aksesPenggunaService";
 import { extractPermissionTypes } from "../../utils/permissionsHelper";
 import { useRolePermissionStore } from "../../store/useRolePermissionStore";
+import { useBasePath } from "../../utils/useBasePath";
 
 export default function AksesHalamanAdminScreen() {
 
   const router = useRouter();
   const { roleId } = useLocalSearchParams(); // 🔥 detect Edit Mode
 
+  const { rootBase: rootPath, basePath } = useBasePath();
+
   const permissions = useRolePermissionStore((s) => s.permissions);
   const setPermission = useRolePermissionStore((s) => s.setPermission);
   const setPermissions = useRolePermissionStore((s) => s.setPermissions);
-  const resetPermissions = useRolePermissionStore((s) => s.resetPermissions);
+ 
 
   const [pages, setPages] = useState<any[]>([]);
   const [loadingPages, setLoadingPages] = useState(true);
@@ -39,7 +42,7 @@ export default function AksesHalamanAdminScreen() {
 
   try {
     console.log("🔍 Preload from server:", roleId);
-    const result = await getAksesPenggunaById(String(roleId),String(pathname));
+    const result = await getAksesPenggunaById(String(roleId),rootPath,basePath);
     const perms = result?.permissions ?? [];
 
     const mapped: Record<string, string[]> = {};
