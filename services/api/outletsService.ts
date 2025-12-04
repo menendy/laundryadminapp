@@ -84,3 +84,38 @@ export const getOutletListLite = async (ownerId: string) => {
     return [];
   }
 };
+
+export interface OutletsByUserListResponse {
+  success: boolean;
+  data: any[];
+  nextCursor?: string | null;
+  limit?: number;
+  total?: number;
+  message?: string;
+  status?: number;
+}
+
+
+export const getOutletsByUser = async (
+  rootPath: string,
+  basePath: string,
+  search: string | null = null,
+  cursor: string | null = null,
+  limit = 10,
+  mode: "semua" | "name" | "path" | "component" = "semua"
+): Promise<OutletsByUserListResponse> => {
+
+  const params = new URLSearchParams();
+
+  params.append("rootPath", rootPath);
+  params.append("basePath", basePath);
+
+  if (search) params.append("search", search);
+  if (cursor) params.append("cursor", cursor);
+
+  params.append("limit", limit.toString());
+  params.append("mode", mode);
+
+  const res = await api.get(`/getOutletUser?${params.toString()}`);
+  return res.data;     // 🟢 jika success langsung return
+};

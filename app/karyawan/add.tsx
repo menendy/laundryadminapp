@@ -11,9 +11,14 @@ import { addMitra } from "../../services/api/mitraService";
 import { getRoleListLite } from "../../services/api/rolesService";
 import { useSnackbarStore } from "../../store/useSnackbarStore";
 import { handleBackendError } from "../../utils/handleBackendError";
+import { useBasePath } from "../../utils/useBasePath";
+
 
 export default function AddKaryawanScreen() {
   const router = useRouter();
+
+  const { rootBase: rootPath, basePath } = useBasePath();
+
   const showSnackbar = useSnackbarStore((s) => s.showSnackbar);
 
   const [nama, setNama] = useState("");
@@ -66,40 +71,46 @@ export default function AddKaryawanScreen() {
     if (assignRole) loadRoles();
   }, [assignRole]);
 
-  const handleSubmit = async () => {
-    if (!validate()) {
-      showSnackbar("Lengkapi data dengan benar", "error");
-      return;
-    }
+const handleSubmit = async () => {
+  if (!validate()) {
+    showSnackbar("Lengkapi data dengan benar", "error");
+    return;
+  }
 
-    try {
-      setLoading(true);
+  try {
+    setLoading(true);
 
-      // PAYLOAD SESUAI FORMAT BACKEND ✔
-      const payload = {
-        name: nama.trim(),
-        alias: alias.trim(),
-        phone: telp.trim(),
-        address: alamat.trim(),
-        role_ids: assignRole ? roleId : null,
-        email: email.trim(),
-        password: password,
-        confirm: confirm,
-      };
+    const payload = {
+      name: nama.trim(),
+      alias: alias.trim(),
+      phone: telp.trim(),
+      address: alamat.trim(),
+      role_ids: assignRole ? roleId : null,
+      email: email.trim(),
+      password,
+      confirm,
+      rootPath,
+      basePath,
+    };
 
-      const result = await addMitra(payload);
-      const ok = handleBackendError(result, setErrors, showSnackbar);
-      if (!ok) return;
+    const result = await addMitra(payload);
 
-      showSnackbar("Karyawan berhasil ditambahkan", "success");
-      router.back();
-    } catch (err) {
-      console.error("🔥 Error addKaryawan:", err);
-      showSnackbar("Terjadi kesalahan koneksi", "error");
-    } finally {
-      setLoading(false);
-    }
-  };
+    // 🔥 Universal handler untuk RESPON backend
+    const ok = handleBackendError(result, setErrors, showSnackbar);
+    if (!ok) return;
+
+    showSnackbar("Karyawan berhasil ditambahkan", "success");
+    router.back();
+
+  } catch (err: any) {
+    console.error("🔥 Error addKaryawan:", err);
+
+    // 🔥 Pakai handler yang sama untuk NETWORK / AXIOS error
+    handleBackendError(err, setErrors, showSnackbar);
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <View style={{ flex: 1, backgroundColor: "#f9f9f9" }}>
@@ -118,7 +129,7 @@ export default function AddKaryawanScreen() {
           placeholder="Contoh: Ridwan Tamar"
           value={nama}
           onChangeText={setNama}
-          error={errors.nama}
+          error={errors.name}
         />
 
         <ValidatedInput
@@ -155,7 +166,7 @@ export default function AddKaryawanScreen() {
           placeholder="contoh: 08123456789"
           value={telp}
           onChangeText={setTelp}
-          error={errors.telp}
+          error={errors.phone}
         />
 
         <ValidatedInput
@@ -165,7 +176,7 @@ export default function AddKaryawanScreen() {
           placeholder="contoh: laundry@gmail.com"
           value={email}
           onChangeText={setEmail}
-          error={errors.telp}
+          error={errors.email}
         />
 
 
@@ -176,7 +187,7 @@ export default function AddKaryawanScreen() {
           placeholder="Jl. Mawar No. 10"
           value={alamat}
           onChangeText={setAlamat}
-          error={errors.alamat}
+          error={errors.address}
         />
 
         {/* Checkbox Assign Role */}
@@ -230,7 +241,7 @@ export default function AddKaryawanScreen() {
               }}
             />
 
-            {errors.roleId && (
+            {errors.role_ids && (
               <Text style={{ color: "red", marginTop: 4 }}>{errors.roleId}</Text>
             )}
           </View>

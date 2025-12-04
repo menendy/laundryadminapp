@@ -16,7 +16,7 @@ export default function BottomNav({ onMenuPress, onMenuClose, isDrawerOpen }) {
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions(); // <-- reactive
   const isWeb = Platform.OS === "web";
-  const isNarrowScreen = width < 768; // sama breakpoint seperti layout
+  const isOverlayMode = width < 1200;
 
   // Hitung posisi tombol tengah secara adaptif (tetap seperti sebelumnya)
   const getAdaptiveMarginBottom = () => {
@@ -40,7 +40,7 @@ export default function BottomNav({ onMenuPress, onMenuClose, isDrawerOpen }) {
     router.push(path);
 
     // kemudian close jika diperlukan
-    const shouldAutoClose = !isWeb || isNarrowScreen;
+    const shouldAutoClose = isOverlayMode;
     if (shouldAutoClose && onMenuClose) {
       onMenuClose();
     }

@@ -82,10 +82,12 @@ export default function AppSearchBarBottomSheet({
   };
 
   // Ambil label dari mode aktif
-  const currentLabel =
-    categories.find((c) => c.value === mode)?.label ||
-    categories.find((c) => c.value === defaultMode)?.label ||
-    "Semua";
+  // Ambil label dari mode aktif atau defaultMode
+const currentLabel =
+  categories.find((c) => c.value === mode)?.label ||
+  categories.find((c) => c.value === defaultMode)?.label ||
+  categories[0]?.label; // fallback ke item pertama (jaga-jaga)
+
   
     const insets = useSafeAreaInsets();
 

@@ -32,6 +32,7 @@ const MENU_JSON: MenuItem[] = [
   { key: "karyawan", label: "Karyawan", icon: "account-group", path: "/karyawan" },
   { key: "akses_pengguna", label: "Akses Pengguna", icon: "account-group", path: "/akses_pengguna" },
   { key: "sysadmin", label: "Pengaturan Sysadmin", icon: "account-group", path: "/sysadmin" },
+  { key: "global_user", label: "Pengaturan Global User", icon: "account-group", path: "/global_user" },
 
   {
     key: "pengaturanAkses",
@@ -52,10 +53,11 @@ const MENU_JSON: MenuItem[] = [
         ],
       },
 
-     
+
       { key: "page_admin", label: "Akses Admin", icon: "account-group-outline", path: "pages_admin" },
       { key: "page_operational", label: "Akses operasional", icon: "account-group-outline", path: "pages_operational" },
-     
+
+
     ],
   },
 ];
@@ -69,6 +71,8 @@ export default function DrawerMenu({ onClose, onMenuTreeChange }: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const { width } = useWindowDimensions();
+  const scrollRef = React.useRef<ScrollView | null>(null);
+
 
   const isWeb = Platform.OS === "web";
   const isNarrow = width < 768;
@@ -101,25 +105,30 @@ export default function DrawerMenu({ onClose, onMenuTreeChange }: Props) {
       toValue: next ? 1 : 0,
       duration: 180,
       useNativeDriver: false,
-    }).start();
+    }).start(() => {
+      if (next && scrollRef.current) {
+        // Auto scroll ke bottom of expanded menu
+        scrollRef.current.scrollToEnd({ animated: true });
+      }
+    });
+
   };
 
   // --------------------------------
   // Navigation
   // --------------------------------
- function navigate(path?: string) {
-  if (!path) return;
+  function navigate(path?: string) {
+    if (!path) return;
 
-  // Close drawer dulu
-  if (!isWeb || isNarrow) {
-    onClose();
+    const isOverlayMode = width < 1200;
 
-    // beri jeda kecil agar animasi start dulu
-    setTimeout(() => router.push(path), 50);
-  } else {
-    router.push(path);
+    if (isOverlayMode) {
+      onClose();
+      setTimeout(() => router.push(path), 50);
+    } else {
+      router.push(path);
+    }
   }
-}
 
   // --------------------------------
   // Recursive Render
@@ -128,6 +137,11 @@ export default function DrawerMenu({ onClose, onMenuTreeChange }: Props) {
     const paddingLeft = 16 + level * 16;
     const hasChild = !!item.children?.length;
     const active = item.path && pathname?.startsWith(item.path);
+
+    // Apakah anaknya ada yang punya children lagi? (nested)
+    const hasNestedChild = !!item.children?.some(
+      (c) => c.children && c.children.length > 0
+    );
 
     // ============================
     // LEAF
@@ -139,8 +153,11 @@ export default function DrawerMenu({ onClose, onMenuTreeChange }: Props) {
           onPress={() => navigate(item.path)}
           style={styles.leafRow(paddingLeft)}
         >
-          <IconButton icon={item.icon as any} size={20} style={{ margin: -4 }} />
-          <Text numberOfLines={1} ellipsizeMode="tail" style={{ marginLeft: 8 }}>
+         <IconButton icon={item.icon as any} size={20} style={{ margin: -4, opacity: 0.85 }} />
+
+          <Text style={{ flexShrink: 1, flexGrow: 1, marginLeft: 8 }}>
+
+
             {item.label}
           </Text>
         </Pressable>
@@ -148,12 +165,56 @@ export default function DrawerMenu({ onClose, onMenuTreeChange }: Props) {
     }
 
     // ============================
-    // PARENT
+    // PARENT (punya child)
     // ============================
     const anim = getAnim(item.key);
     const isOpen = !!openMap[item.key];
     const maxH = heights.current[item.key] || 0;
 
+    // ⚠️ Jika dia punya anak yang juga punya children (nested)
+    //    JANGAN gunakan maxHeight + overflow (bisa memotong konten di bawahnya)
+    if (hasNestedChild) {
+      return (
+        <View key={item.key}>
+          {/* PARENT ROW */}
+          <Pressable
+            onPress={() => toggle(item.key)}
+            style={({ pressed }) => [
+              styles.parentRow,
+              pressed && styles.pressedRow,
+            ]}
+          >
+            <View style={[styles.parentLeft, { paddingLeft }]}>
+              <IconButton
+                icon={item.icon as any}
+                size={20}
+                style={{ margin: -4, opacity: 0.8 }}
+              />
+              <Text style={styles.parentLabel}>{item.label}</Text>
+            </View>
+
+            <AnimatedIconButton
+              icon={isOpen ? "chevron-up" : "chevron-down"}
+              size={20}
+              onPress={() => toggle(item.key)}
+              style={{ marginRight: 12 }}
+            />
+          </Pressable>
+
+          {/* Jika open → render anaknya dengan tinggi natural */}
+          {isOpen && (
+           <View style={{ paddingLeft: 32, paddingRight: 20 }}>
+
+              {item.children!.map((c) => renderItem(c, level + 1))}
+            </View>
+          )}
+        </View>
+      );
+    }
+
+    // ============================
+    // PARENT NORMAL (anaknya semua leaf)
+    // ============================
     return (
       <View key={item.key}>
         {/* PARENT ROW */}
@@ -165,7 +226,11 @@ export default function DrawerMenu({ onClose, onMenuTreeChange }: Props) {
           ]}
         >
           <View style={[styles.parentLeft, { paddingLeft }]}>
-            <IconButton icon={item.icon as any} size={20} style={{ margin: -4, opacity: 0.8 }} />
+            <IconButton
+              icon={item.icon as any}
+              size={20}
+              style={{ margin: -4, opacity: 0.8 }}
+            />
             <Text style={styles.parentLabel}>{item.label}</Text>
           </View>
 
@@ -177,19 +242,17 @@ export default function DrawerMenu({ onClose, onMenuTreeChange }: Props) {
           />
         </Pressable>
 
-        {/* ----------------------------------------
-            Hidden measurement (MOBILE FIX)
-            Only rendered until height is detected
-        ---------------------------------------- */}
+        {/* Hidden measurement (untuk parent ini saja) */}
         {!heights.current[item.key] && (
           <View
             style={{ position: "absolute", left: -9999, top: 0, opacity: 0 }}
             onLayout={(e) => {
               heights.current[item.key] = e.nativeEvent.layout.height;
-              setVersion((v) => v + 1); // trigger re-render
+              setVersion((v) => v + 1);
             }}
           >
-            <View style={{ paddingLeft: 32 }}>
+           <View style={{ paddingLeft: 32, paddingRight: 20 }}>
+
               {item.children!.map((c) => renderItem(c, level + 1))}
             </View>
           </View>
@@ -198,12 +261,16 @@ export default function DrawerMenu({ onClose, onMenuTreeChange }: Props) {
         {/* Animated children */}
         <Animated.View
           style={{
-            height: anim.interpolate({ inputRange: [0, 1], outputRange: [0, maxH] }),
+            maxHeight: anim.interpolate({
+              inputRange: [0, 1],
+              outputRange: [0, maxH],
+            }),
             overflow: "hidden",
           }}
           pointerEvents={isOpen ? "auto" : "none"}
         >
-          <View style={{ paddingLeft: 32 }}>
+          <View style={{ paddingLeft: 32, paddingRight: 20 }}>
+
             {item.children!.map((c) => renderItem(c, level + 1))}
           </View>
         </Animated.View>
@@ -211,11 +278,20 @@ export default function DrawerMenu({ onClose, onMenuTreeChange }: Props) {
     );
   }
 
+
+
   // --------------------------------
   // RENDER ROOT
   // --------------------------------
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: "#fff" }}>
+    <ScrollView
+      ref={scrollRef}
+      style={{ flex: 1, backgroundColor: "#fff" }}
+      contentContainerStyle={{
+        paddingBottom: 40, // biar ada ruang scroll bawah
+      }}
+      showsVerticalScrollIndicator
+    >
       <View style={styles.header}>
         <Text variant="titleMedium" style={{ fontWeight: "600" }}>Menu</Text>
         <IconButton icon="close" onPress={onClose} />
@@ -225,7 +301,7 @@ export default function DrawerMenu({ onClose, onMenuTreeChange }: Props) {
         {MENU_JSON.map((mi) => renderItem(mi))}
       </Drawer.Section>
 
-  
+
     </ScrollView>
   );
 }
@@ -245,8 +321,9 @@ const styles = StyleSheet.create({
 
   leafRow: (paddingLeft: number) => ({
     paddingLeft,
+    paddingRight: 20,    // ➜ memberi space kanan untuk teks
     minHeight: 48,
-    paddingVertical: 12,
+    width: "100%",       // ➜ penuhi lebar drawer
     flexDirection: "row",
     alignItems: "center",
   }),

@@ -1,4 +1,4 @@
-// hooks/UniversalPaginatedList.ts (FULL FIX 403 LOOP)
+// hooks/UniversalPaginatedList.ts (WITH SCREEN FOCUS FIX)
 
 import React, {
   useState,
@@ -60,9 +60,9 @@ export function useUniversalPaginatedList<T, M extends string>({
       passedSearch: string = "",
       passedCursor: string | null = null
     ) => {
-      if (fetchLock.current) return;
-      if (!focusedRef.current) return;
       if (error) return;
+      if (!focusedRef.current) return; // 🔥 only fetch if screen active
+      if (fetchLock.current) return;
 
       fetchLock.current = true;
       setLoading(true);
@@ -77,17 +77,14 @@ export function useUniversalPaginatedList<T, M extends string>({
           mode
         );
 
-        const ok = handleBackendError(result as any, () => {}, showSnackbar);
-
+        const ok = handleBackendError(result as any, () => { }, showSnackbar);
         if (!ok) {
-          const r: any = result;
           setError(true);
           setHasMore(false);
 
-          // ⛔ Stop full pagination jika 403 ACCESS DENIED
-          if (r?.status === 403) {
-            fetchLock.current = true;
-            setItems([]); // Kosongkan supaya user tau tidak ada akses
+          // 🚫 Stop fetching loop kalau 403 Forbidden dari RBAC
+          if ((result as any)?.status === 403) {
+            fetchLock.current = true; // 🔒 block fetch selanjutnya
           }
 
           return;
@@ -97,50 +94,57 @@ export function useUniversalPaginatedList<T, M extends string>({
 
         setItems((prev) => (reset ? data : [...prev, ...data]));
         setCursor(result.nextCursor ?? null);
-        setHasMore(!!result.nextCursor);
+
+        // 🚫 Jika fetch awal menghasilkan data kosong → hentikan pagination
+        if (reset && data.length === 0) {
+          setHasMore(false);
+        } else {
+          setHasMore(result.nextCursor !== null);
+        }
+
+        setError(false);
 
       } catch (err: any) {
         setError(true);
-        setHasMore(false);
 
         showSnackbar(
           err?.response?.data?.message ||
-            err?.message ||
-            "Gagal memuat data dari server",
+          err?.message ||
+          "Gagal memuat data dari server",
           "error"
         );
 
+        setHasMore(false);
       } finally {
+        fetchLock.current = false;
         setLoading(false);
-
-        // Jika bukan 403 → allow fetch ulang lagi
-        if (!(error && fetchLock.current)) {
-          fetchLock.current = false;
-        }
       }
     },
     [rootPath, basePath, mode, limit, fetchFn, showSnackbar, error]
   );
 
-  // 📌 Load saat screen FOCUS pertama kali — TAPI hanya jika tidak error
+  // 🔥 Detect Screen Focus — Expo Router
   useFocusEffect(
     useCallback(() => {
       focusedRef.current = true;
 
-      if (!error && items.length === 0 && !loading && search.trim() === "") {
+      // Reload hanya saat screen baru fokus & bukan search
+      if (!error && items.length === 0 && !loading && hasMore && search.trim() === "") {
+
+        setError(false);
         setCursor(null);
-        safeFetch(true, "", null);
+        safeFetch(true, "", null); // ✅ pakai "" bukan null
       }
 
       return () => {
         focusedRef.current = false;
       };
-    }, [items.length, loading, search, safeFetch, error])
+    }, [items.length, loading, search, safeFetch])
   );
 
-  // 🔎 Search — TAPI hanya jika tidak error
+  // 🔄 Search Debounce
   useEffect(() => {
-    if (!focusedRef.current || error) return;
+    if (!focusedRef.current) return;
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
 
     debounceTimer.current = setTimeout(() => {
@@ -151,21 +155,22 @@ export function useUniversalPaginatedList<T, M extends string>({
     return () => {
       if (debounceTimer.current) clearTimeout(debounceTimer.current);
     };
-  }, [search, safeFetch, error]);
+  }, [search, safeFetch]);
 
-  // 🔄 Mode change — TAPI tidak override search atau error
+  // 🔄 Mode change refresh
   useEffect(() => {
-    if (!focusedRef.current || error) return;
-    if (search.trim() !== "") return;
+    if (!focusedRef.current) return;
+    if (search.trim() !== "") return; // ❗ jangan ganggu ketika user sedang search
 
     setCursor(null);
-    safeFetch(true, "", null);
-  }, [mode, search, safeFetch, error]);
+    safeFetch(true, "", null); // ✅ pakai "" bukan null
+  }, [mode, search, safeFetch]);
 
-  // 🔁 Manual refresh only
+  // 🔄 Pull to Refresh
   const onRefresh = async () => {
-    if (!focusedRef.current || error) return;
+    if (!focusedRef.current) return;
     setRefreshing(true);
+    setError(false);
     setCursor(null);
 
     await safeFetch(true, search, null);
@@ -173,14 +178,15 @@ export function useUniversalPaginatedList<T, M extends string>({
     setRefreshing(false);
   };
 
+  // ⬇️ Infinite Scroll — Only if focused
   const onEndReached = async () => {
-    if (!focusedRef.current || loading || error) return;
+    if (!focusedRef.current) return;
 
     const now = Date.now();
     if (now - lastThrottleTime.current < 700) return;
     lastThrottleTime.current = now;
 
-    if (!hasMore) return;
+    if (!hasMore || loading || error) return;
 
     await safeFetch(false, search, cursor);
   };

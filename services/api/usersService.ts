@@ -15,34 +15,38 @@ export const getUsersLite = async (): Promise<UsersLiteResponse> => {
   }
 };
 
-export interface UserProfileResponse {
+export interface UserProfileResponse { 
   success: boolean;
-  message: string;
   profile: {
-    uid: string;
-    name: string;
-    email: string;
-    phone?: string;
-    role_id_default?: string;
-    owner_id_default?: string;
-    outlet_id_default?: string;
+    uid?: string;
+    active?: boolean;
+    alamat?: string;
+    email?: string | null;
+    name?: string | null;
+    phone?: string | null;
+    outlet_id_default?: string | null;
+  } | null; // ⬅ tambahkan null di sini
+  outlet_default?: {
+    id: string;
+    name: string | null;
+    active: boolean;
   } | null;
+  message?: string; // ⬅ tambahkan juga agar tidak merah TS
 }
 
+
+
 export const getUserProfile = async (
-  modul: string,
-  path: string
 ): Promise<UserProfileResponse> => {
   try {
-    const res = await api.get(
-      `/getUserProfile?modul=${encodeURIComponent(modul)}&path=${encodeURIComponent(path)}`
-    );
+    const res = await api.get(`/getUserProfile`);
     return res.data;
   } catch (err: any) {
     console.error("❌ getUserProfile error:", err);
     return {
       success: false,
       profile: null,
+      
       message: err?.response?.data?.message ?? "Gagal memuat profil"
     };
   }

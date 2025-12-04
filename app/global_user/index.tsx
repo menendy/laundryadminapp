@@ -1,25 +1,26 @@
-import React, { memo } from "react";
+import React, { memo, useState } from "react";
 import {
-  View, FlatList, RefreshControl, Keyboard, Text,
-  ToastAndroid, Platform, Pressable
+  View,
+  FlatList,
+  RefreshControl,
+  Keyboard,
+  Text, Pressable, Platform,ToastAndroid
 } from "react-native";
-import { Card, List, ActivityIndicator } from "react-native-paper";
-import Clipboard from "@react-native-clipboard/clipboard";
-
-import Animated, { ZoomIn, ZoomOut } from "react-native-reanimated";
-
-import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { Card, List, Button, ActivityIndicator } from "react-native-paper";
 import { useRouter } from "expo-router";
 
+import Clipboard from "@react-native-clipboard/clipboard";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 
-import { getMitraList } from "../../services/api/mitraService";
+import Animated, { ZoomIn, ZoomOut } from "react-native-reanimated";
+import { getGlobalUserList } from "../../services/api/globaluserService";
 import AppHeaderList from "../../components/ui/AppHeaderList";
 import AppSearchBarBottomSheet from "../../components/ui/AppSearchBarBottomSheet";
 import { useUniversalPaginatedList } from "../../hooks/UniversalPaginatedList";
 import { useBasePath } from "../../utils/useBasePath";
 
-// Item Card
-const MitraItem = memo(({ item, activeMenuId, onOpenMenu, onCloseMenu, onView, onEdit }: any) => {
+/* CARD */
+const PageAdminItem = memo(({ item, activeMenuId, onOpenMenu, onCloseMenu, onView, onEdit }: any) => {
 
   const copyId = () => {
     Clipboard.setString(item.id);
@@ -45,53 +46,40 @@ const MitraItem = memo(({ item, activeMenuId, onOpenMenu, onCloseMenu, onView, o
       <List.Item
         title={item.name}
         titleStyle={{ marginBottom: 6, fontWeight: "bold", fontSize: 17 }}
-        description={() => (
-          <View style={{ marginTop: 4 }}>
-
-            <View style={{ flexDirection: "row", marginBottom: 2 }}>
-              <MaterialCommunityIcons name="email" size={16} color="#999" />
-              <Text style={{ fontSize: 12, color: "#666", marginRight: 8, marginLeft: 5, }}>
+        description={
+          <>
+            <View style={{ marginTop: 4 }}>
+              {/* email */}
+              <View style={{ flexDirection: "row", marginBottom: 2 }}>
+                
+                <Text style={{ fontSize: 14 }}>
                 {item.email}
-              </Text>
+                </Text>
+              </View>
+
+              {/* Status */}
+              <View style={{ flexDirection: "row", marginBottom: 2 }}>
+
+                <Text style={{ fontSize: 14, color: item.active ? "green" : "red", fontWeight: "600" }}>
+                  {item.active ? "Aktif" : "Tidak Aktif"}
+                </Text>
+              </View>
+
+
+              {/* Copy ID */}
+              <View style={{ flexDirection: "row", alignItems: "center" }}>
+                <Text style={{ fontSize: 12, color: "#666", marginRight: 8 }}>
+                  {item.id}
+                </Text>
+                <Pressable onPress={copyId}>
+                  <MaterialCommunityIcons name="content-copy" size={18} color="#666" style={{ marginTop: -3, marginLeft: -5 }} />
+                </Pressable>
+              </View>
+
             </View>
 
-            {/* Status Aktif / Nonaktif */}
-            <View style={{ flexDirection: "row", marginBottom: 2 }}>
-              <MaterialCommunityIcons
-                name={item.active ? "check-circle" : "close-circle"}
-                size={16}
-                color={item.active ? "green" : "red"}
-              />
-              <Text
-                style={{
-                  fontSize: 12,
-                  color: item.active ? "green" : "red",
-                  fontWeight: "600",
-                  marginLeft: 5
-                }}
-              >
-                {item.active ? "Aktif" : "Nonaktif"}
-              </Text>
-            </View>
-
-
-            {/* Copy ID */}
-            <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <Text style={{ fontSize: 12, color: "#666", marginRight: 8 }}>
-                {item.id}
-              </Text>
-              <Pressable onPress={copyId}>
-                <MaterialCommunityIcons
-                  name="content-copy"
-                  size={18}
-                  color="#666"
-                  style={{ marginTop: -3, marginLeft: -5 }}
-                />
-              </Pressable>
-            </View>
-
-          </View>
-        )}
+          </>
+        }
         descriptionNumberOfLines={6}
         right={() => (
           <Pressable onPress={onOpenMenu} style={{ paddingHorizontal: 3 }}>
@@ -99,7 +87,6 @@ const MitraItem = memo(({ item, activeMenuId, onOpenMenu, onCloseMenu, onView, o
           </Pressable>
         )}
       />
-
 
       {/* Popup */}
       {isMenuVisible && (
@@ -183,54 +170,52 @@ const MitraItem = memo(({ item, activeMenuId, onOpenMenu, onCloseMenu, onView, o
 
 });
 
-
-
-export default function KaryawanListScreen() {
+export default function GlobalUserListScreen() {
   const router = useRouter();
   const { rootBase: rootPath, basePath } = useBasePath();
 
-
-  const list = useUniversalPaginatedList<any, "nama" | "telp" | "email">({
+  const list = useUniversalPaginatedList({
     rootPath,
     basePath,
-    fetchFn: getMitraList,
-    defaultMode: "nama",
+    fetchFn: getGlobalUserList,
+    defaultMode: "semua",
   });
 
+   const [activeMenuId, setActiveMenuId] = React.useState<string | null>(null);
 
-  const [activeMenuId, setActiveMenuId] = React.useState<string | null>(null);
-
-  const renderItem = ({ item }: any) => (
-    <MitraItem
+    const renderItem = ({ item }: any) => (
+    <PageAdminItem
       item={item}
       activeMenuId={activeMenuId}
       onOpenMenu={() => setActiveMenuId(item.id)}
       onCloseMenu={() => setActiveMenuId(null)}
       onView={(i: any) => {
         setActiveMenuId(null);
-        router.push(`/karyawan/${i.id}`);
+        router.push(`/global_user/${i.id}`);
       }}
       onEdit={(i: any) => {
         setActiveMenuId(null);
-        router.push(`/karyawan/edit/${i.id}`);
+        router.push(`/global_user/edit/${i.id}`);
       }}
     />
   );
 
   return (
     <View style={{ flex: 1, backgroundColor: "#f9f9f9" }}>
-      <AppHeaderList title="Daftar Mitra" onAdd={() => router.push("/karyawan/add")} />
+      <AppHeaderList title="Data Global User" onAdd={() => router.push("/global_user/add")} />
 
       <AppSearchBarBottomSheet
         value={list.search}
         onChangeText={list.setSearch}
         mode={list.mode}
-        onChangeMode={list.setMode}
+        onChangeMode={(m) => list.setMode(m)}
+        placeholder="Cari nama / telp..."
         categories={[
+          { label: "Semua", value: "semua" },
           { label: "Nama", value: "nama" },
-          { label: "Telp", value: "telp" },
-          { label: "Email", value: "email" },
+          { label: "Telepon", value: "telp" },
         ]}
+        defaultMode="semua"
       />
 
       {list.loading && list.items.length === 0 && (
@@ -240,9 +225,6 @@ export default function KaryawanListScreen() {
       )}
 
       <FlatList
-        style={{ flex: 1 }}
-        contentContainerStyle={{ paddingBottom: 100 }}
-        scrollEnabled={true}
         data={list.items}
         keyExtractor={(i) => i.id}
         renderItem={renderItem}
@@ -253,7 +235,7 @@ export default function KaryawanListScreen() {
         onEndReached={list.onEndReached}
         ListEmptyComponent={
           !list.loading ? (
-            <Text style={{ textAlign: "center", marginTop: 20, color: "#777" }}>
+            <Text style={{ textAlign: "center", marginTop: 20 }}>
               Belum ada data
             </Text>
           ) : null

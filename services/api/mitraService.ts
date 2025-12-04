@@ -20,7 +20,7 @@ export const getMitraList = async (
   search: string | null = null,
   cursor: string | null = null,
   limit = 10,
-  mode: "semua" | "nama" | "telp" = "semua"
+  mode: "nama" | "telp" | "email" = "nama"
 ): Promise<MitraListResponse> => {
   try {
     const params = new URLSearchParams();
@@ -60,24 +60,13 @@ export interface MitraResponse {
   errors?: { field: string | null; message: string }[];
 }
 
-/**
- * 🚀 Tambah mitra baru
- * - Tidak perlu try/catch lagi
- * - Karena error sudah ditangani oleh interceptor
- */
-export const addMitra = async (payload: MitraPayload): Promise<MitraResponse> => {
-  try {
-    const res = await api.post("/addMitra_v2", payload);
-    return res.data;  // success
-  } catch (err: any) {
-    // ---- PATCH PALING PENTING ----
-    return err?.response?.data || {
-      success: false,
-      message: "Gagal mengirim data",
-      status: err?.response?.status || 500,
-      errors: []
-    };
 
-  }
+export interface MitraPayload {
+ 
+}
+
+
+export const addMitra = async (payload: MitraPayload) => {
+  const res = await api.post("/addMitra_v2", payload);
+  return res.data;
 };
-

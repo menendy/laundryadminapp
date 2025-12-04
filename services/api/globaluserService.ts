@@ -1,11 +1,11 @@
 import { api } from "./client";
 
 
-export interface SysadminPayload {
+export interface GlobalUserPayload {
  
 }
 
-export interface SysadminResponse {
+export interface GlobalUserResponse {
   success?: boolean;
   id?: string;
   message?: string;
@@ -14,9 +14,9 @@ export interface SysadminResponse {
   errors?: { field: string | null; message: string }[];
 }
 
-export const addSysadmin = async (payload: SysadminPayload): Promise<SysadminResponse> => {
+export const addGlobalUser = async (payload: GlobalUserPayload): Promise<GlobalUserResponse> => {
   try {
-    const res = await api.post("/addSysadmin", payload);
+    const res = await api.post("/addGlobalUser", payload);
     return res.data;  // success
   } catch (err: any) {
     // ---- PATCH PALING PENTING ----
@@ -30,7 +30,7 @@ export const addSysadmin = async (payload: SysadminPayload): Promise<SysadminRes
   }
 };
 
-export interface SysadminListResponse {
+export interface GlobalUserListResponse {
   success: boolean;
   data: any[];
   nextCursor?: string | null;
@@ -40,14 +40,14 @@ export interface SysadminListResponse {
   status?: number;
 }
 
-export const getSysadminList = async (
+export const getGlobalUserList = async (
   rootPath: string,                   
   basePath: string,                    
   search: string | null = null,
   cursor: string | null = null,
   limit = 10,
   mode: "semua" | "nama" | "telp" = "semua"
-): Promise<SysadminListResponse> => {
+): Promise<GlobalUserListResponse> => {
   try {
     const params = new URLSearchParams();
 
@@ -59,7 +59,7 @@ export const getSysadminList = async (
     params.append("limit", limit.toString());
     params.append("mode", mode);
 
-    const res = await api.get(`/getSysadminList?${params.toString()}`);
+    const res = await api.get(`/getGlobalUserList?${params.toString()}`);
 
     return res.data;
 
@@ -73,19 +73,4 @@ export const getSysadminList = async (
       status: err?.response?.status || 500
     };
   }
-};
-
-export const getSysadminById = async (id: string) => {
-  const res = await api.get(`/getSysadminDetail?id=${id}`);
-  return res.data;
-};
-
-export interface UpdateSysadminPayload {
-
-}
-
-
-export const updateSysadmin = async (payload: UpdateSysadminPayload) => {
-  const res = await api.put("/updateSysadmin", payload);
-  return res.data;
 };

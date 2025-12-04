@@ -1,41 +1,34 @@
 import React, { useEffect, useState } from "react";
-import { View } from "react-native";
-import { Text, Avatar, Button } from "react-native-paper";
+import { View, TouchableOpacity, StyleSheet } from "react-native";
+import { Text, Avatar, List } from "react-native-paper";
 import { useRouter, usePathname } from "expo-router";
-import { signOut, auth } from "../../services/firebase";
 import { getUserProfile } from "../../services/api/usersService";
 import { handleBackendError } from "../../utils/handleBackendError";
 import { useSnackbarStore } from "../../store/useSnackbarStore";
+import { signOut, auth } from "../../services/firebase";
+
+interface RightValueProps {
+  text: string;
+  warning?: boolean;
+}
 
 export default function ProfilAkun() {
   const router = useRouter();
   const pathname = usePathname();
-
-  const [name, setName] = useState("Loading...");
-  const [email, setEmail] = useState("");
-
   const showSnackbar = useSnackbarStore((s) => s.showSnackbar);
 
+  const [profile, setProfile] = useState<any>({
+    name: "-",
+    email: "",
+    phone: "",
+    bio: "",
+    gender: "",
+    birthday: "",
+    photo_url: null,
+    outlet_default: null,
+  });
 
-  useEffect(() => {
-    const loadProfile = async () => {
-      try {
-        const res = await getUserProfile("profil", pathname); // ⬅ modul + path dikirim ke backend
 
-        const success = handleBackendError(res, () => { }, showSnackbar);
-        if (!success) return;
-
-        if (res.profile) {
-          setName(res.profile.name ?? "-");
-          setEmail(res.profile.email ?? "-");
-        }
-      } catch (err: any) {
-        handleBackendError(err, () => { }, showSnackbar);
-      }
-    };
-
-    loadProfile();
-  }, []); // ⬅ reload jika pindah tenant/page
 
   const getInitials = (fullName: string) =>
     fullName
@@ -46,24 +39,203 @@ export default function ProfilAkun() {
       .slice(0, 2)
       .toUpperCase() || "?";
 
-  const handleLogout = async () => {
-    await signOut(auth);
-    router.replace("/auth/login");
+  const maskEmail = (email: string) => {
+    if (!email) return "";
+    const idx = email.indexOf("@");
+    if (idx <= 1) return email;
+    return email[0] + "******" + email.slice(idx - 1);
   };
 
-  return (
-    <View style={{ padding: 16, alignItems: "center" }}>
-      <Avatar.Text label={getInitials(name)} size={72} />
+  const maskPhone = (phone: string) => {
+    if (!phone) return "";
+    const len = phone.length;
+    return "*".repeat(len - 2) + phone.slice(len - 2);
+  };
 
-      <Text variant="titleLarge" style={{ marginTop: 12 }}>
-        {name}
+  const RightValue: React.FC<RightValueProps> = ({ text, warning = false }) => (
+    <View style={styles.rightContainer}>
+      <Text style={warning ? styles.rightTextWarning : styles.rightText}>
+        {text}
       </Text>
+      <List.Icon icon="chevron-right" />
+    </View>
+  );
 
-      {email ? <Text variant="bodyMedium">{email}</Text> : null}
+  useEffect(() => {
+    const load = async () => {
+      const res = await getUserProfile();
+      const success = handleBackendError(res, () => { }, showSnackbar);
+      if (!success) return;
+      if (res.profile) {
+        setProfile({
+          ...res.profile,
+          outlet_default: res.outlet_default ?? null,
+        });
+      }
+    };
+    load();
+  }, []);
 
-      <Button mode="contained" onPress={handleLogout} style={{ marginTop: 20 }}>
-        Logout
-      </Button>
+  return (
+    <View style={styles.container}>
+      {/* AVATAR SECTION */}
+      <View style={styles.avatarContainer}>
+        <TouchableOpacity onPress={() => router.push("/profil/ubahFoto")}>
+          {profile.photo_url ? (
+            <Avatar.Image source={{ uri: profile.photo_url }} size={90} />
+          ) : (
+            <Avatar.Text label={getInitials(profile.name)} size={90} />
+          )}
+        </TouchableOpacity>
+        <Text style={styles.editPhotoText}>Ubah</Text>
+      </View>
+
+  
+      {/* SECTION 1 → OUTLET */}
+      <View style={styles.sectionCard}>
+        <List.Item
+          title="Outlet"
+          right={() => (
+            <RightValue
+              text={profile.outlet_default?.name || "Atur Sekarang"}
+              warning={!profile.outlet_default}
+            />
+          )}
+          onPress={() => router.push("/profil/editOutlet")}
+          android_ripple={{ color: "transparent" }}
+        />
+      </View>
+
+
+
+      {/* SECTION 1 → Nama + Bio */}
+      <View style={styles.sectionCard}>
+        <List.Item
+          title="Nama"
+          right={() => (
+            <RightValue text={profile.name || "Atur Sekarang"} />
+          )}
+          onPress={() => router.push("/profil/editNama")}
+          android_ripple={{ color: "transparent" }}
+        />
+        <View style={styles.divider} />
+        <List.Item
+          title="Bio"
+          right={() => (
+            <RightValue text={profile.bio || "Atur Sekarang"} />
+          )}
+          onPress={() => router.push("/profil/editBio")}
+          android_ripple={{ color: "transparent" }}
+        />
+      </View>
+
+      {/* SECTION 2 → Jenis Kelamin + Tanggal Lahir */}
+      <View style={styles.sectionCard}>
+        <List.Item
+          title="Jenis Kelamin"
+          right={() => (
+            <RightValue
+              text={profile.gender || "Atur Sekarang"}
+              warning={!profile.gender}
+            />
+          )}
+          onPress={() => router.push("/profil/editGender")}
+          android_ripple={{ color: "transparent" }}
+        />
+        <View style={styles.divider} />
+        <List.Item
+          title="Tanggal Lahir"
+          right={() => (
+            <RightValue
+              text={profile.birthday || "**/**/****"}
+              warning={!profile.birthday}
+            />
+          )}
+          onPress={() => router.push("/profil/editBirthday")}
+          android_ripple={{ color: "transparent" }}
+        />
+      </View>
+
+      {/* SECTION 3 → HP + Email */}
+      <View style={styles.sectionCard}>
+        <List.Item
+          title="No. Handphone"
+          right={() => (
+            <RightValue
+              text={maskPhone(profile.phone) || "Atur Sekarang"}
+            />
+          )}
+          onPress={() => router.push("/profil/editPhone")}
+          android_ripple={{ color: "transparent" }}
+        />
+        <View style={styles.divider} />
+        <List.Item
+          title="Email"
+          right={() => (
+            <RightValue
+              text={maskEmail(profile.email) || "Atur Sekarang"}
+            />
+          )}
+          onPress={() => router.push("/profil/editEmail")}
+          android_ripple={{ color: "transparent" }}
+        />
+      </View>
+
+      {/* Logout tanpa arrow */}
+      <List.Item
+        title="Logout"
+        left={() => <List.Icon icon="logout" />}
+        onPress={() => {
+          signOut(auth);
+          router.replace("/auth/login");
+        }}
+      />
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#F4F4F4",
+    paddingHorizontal: 16,
+  },
+  avatarContainer: {
+    alignItems: "center",
+    paddingVertical: 28,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    marginTop: 16,
+    marginBottom: 20,
+  },
+  editPhotoText: {
+    marginTop: 6,
+    color: "#FF5722",
+    fontWeight: "600",
+  },
+  sectionCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    marginBottom: 22,
+    paddingLeft: 12,
+    overflow: "hidden",
+  },
+  divider: {
+    height: 1,
+    backgroundColor: "#E6E6E6",
+    marginLeft: 16,
+  },
+  rightContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  rightText: {
+    color: "#555",
+    fontWeight: "500",
+  },
+  rightTextWarning: {
+    color: "#E53935",
+    fontWeight: "500",
+  },
+});
