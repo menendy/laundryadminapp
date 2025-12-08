@@ -51,3 +51,15 @@ export const getUserProfile = async (
     };
   }
 };
+
+
+export interface UserProfileUpdatePayload {
+ 
+
+}
+
+
+export const updateUserProfile = async (payload: UserProfileUpdatePayload) => {
+  const res = await api.post("/addPagesAdmin", payload);
+  return res.data;
+};

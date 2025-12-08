@@ -1,28 +1,50 @@
-import React, { useState } from "react";
-import { View, ScrollView, Text } from "react-native";
-import { Button, } from "react-native-paper";
-import { useRouter } from "expo-router";
-import AppHeaderActions from "../../components/ui/AppHeaderActions";
-import ValidatedInput from "../../components/ui/ValidatedInput";
-import { useSnackbarStore } from "../../store/useSnackbarStore";
-import { addOutlet } from "../../services/api/outletsService";
-import { handleBackendError } from "../../utils/handleBackendError";
-import { useBasePath } from "../../utils/useBasePath";
+import React, { useState, useEffect } from "react";
+import { View, ScrollView, ActivityIndicator, Text } from "react-native";
+import { Button } from "react-native-paper";
+import { useRouter, useLocalSearchParams } from "expo-router";
+import AppHeaderActions from "../../../components/ui/AppHeaderActions";
+import ValidatedInput from "../../../components/ui/ValidatedInput";
+import { useSnackbarStore } from "../../../store/useSnackbarStore";
+import { useBasePath } from "../../../utils/useBasePath";
+import { handleBackendError } from "../../../utils/handleBackendError";
 
-export default function AddOutletScreen() {
+import { getOutletById, updateOutlet } from "../../../services/api/outletsService";
+
+export default function EditOutletScreen() {
   const router = useRouter();
+  const { id } = useLocalSearchParams(); // /edit?id=xxxx
 
   const { rootBase: rootPath, basePath } = useBasePath();
-
   const showSnackbar = useSnackbarStore((s) => s.showSnackbar);
 
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
 
-
   const [loading, setLoading] = useState(false);
+  const [loadingFetch, setLoadingFetch] = useState(true);
   const [errors, setErrors] = useState<any>({});
+  
+  // Load data awal
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const result = await getOutletById(id as string,rootPath,basePath);
+        console.log("Outlet detail:", result);
+
+        setName(result.name || "");
+        setPhone((result.phone || "").replace(/^(\+62|62)/, "")); // hilangkan prefix dulu
+        setAddress(result.address || "");
+      } catch (err) {
+        console.error("❌ Error getOutletById:", err);
+        showSnackbar("Gagal memuat data outlet", "error");
+      } finally {
+        setLoadingFetch(false);
+      }
+    };
+
+    fetchData();
+  }, [id]);
 
   const validate = () => {
     const e: any = {};
@@ -43,43 +65,44 @@ export default function AddOutletScreen() {
     try {
       setLoading(true);
 
-      const result = await addOutlet({
-        name,
-        address,
-        phone,
-        rootPath,
-        basePath,
-      });
+      const payload = {
+        id, name, address, phone, rootPath, basePath,
+      };
+
+
+      const result = await updateOutlet( String(id), payload );
 
       const ok = handleBackendError(result, setErrors, showSnackbar);
       if (!ok) return;
 
-
-      showSnackbar("berhasil ditambahkan", "success");
-      //router.back();
+      showSnackbar("Outlet berhasil diperbarui", "success");
+      router.back(); // karena edit → balik ke list/detail
 
     } catch (err) {
-
-      console.error("🔥 Error addOutlet:", err);
-      // 🔥 Pakai handler yang sama untuk NETWORK / AXIOS error
+      console.error("🔥 Error updateOutlet:", err);
       handleBackendError(err, setErrors, showSnackbar);
-
     } finally {
       setLoading(false);
     }
   };
 
+  if (loadingFetch) {
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+        <ActivityIndicator />
+      </View>
+    );
+  }
+
   return (
     <View style={{ flex: 1, backgroundColor: "#f9f9f9" }}>
-      <AppHeaderActions title="Tambah Outlet" showBack />
+      <AppHeaderActions title="Edit Outlet" showBack />
 
       <ScrollView contentContainerStyle={{ padding: 20 }}>
-
-
+        
         <ValidatedInput
           label="Nama Outlet"
           required
-          placeholder="Contoh: Outlet Depok"
           value={name}
           onChangeText={setName}
           error={errors.name}
@@ -103,19 +126,16 @@ export default function AddOutletScreen() {
           prefix={<Text style={{ fontSize: 16, color: "#555" }}>+62</Text>}
         />
 
-
         <ValidatedInput
           label="Alamat Outlet"
           required
-          placeholder="Contoh Jl. Margonda Raya..."
           value={address}
           onChangeText={setAddress}
           error={errors.address}
           multiline
-          numberOfLines={3}  // bisa disesuaikan
-          style={{ minHeight: 100, textAlignVertical: "top" }} // supaya teks mulai dari atas
+          numberOfLines={3}
+          style={{ minHeight: 100, textAlignVertical: "top" }}
         />
-
 
         <Button
           mode="contained"
@@ -124,7 +144,7 @@ export default function AddOutletScreen() {
           disabled={loading}
           style={{ marginTop: 16 }}
         >
-          {loading ? "Menyimpan..." : "Tambah Outlet"}
+          {loading ? "Menyimpan..." : "Simpan Perubahan"}
         </Button>
       </ScrollView>
     </View>

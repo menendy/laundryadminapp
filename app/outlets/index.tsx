@@ -13,12 +13,13 @@ import { Card, List, ActivityIndicator } from "react-native-paper";
 import Clipboard from "@react-native-clipboard/clipboard";
 import Animated, { ZoomIn, ZoomOut } from "react-native-reanimated";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { useRouter, usePathname } from "expo-router";
+import { useRouter } from "expo-router";
 
 import { getOutletList } from "../../services/api/outletsService";
 import AppHeaderList from "../../components/ui/AppHeaderList";
 import AppSearchBarBottomSheet from "../../components/ui/AppSearchBarBottomSheet";
 import { useUniversalPaginatedList } from "../../hooks/UniversalPaginatedList";
+import { useBasePath } from "../../utils/useBasePath";
 
 /* CARD ITEM */
 const OutletItem = memo(
@@ -49,27 +50,64 @@ const OutletItem = memo(
           titleStyle={{ marginBottom: 6, fontWeight: "bold", fontSize: 17 }}
           description={
             <>
-              <Text style={{ fontSize: 14 }}>Alamat: {item.address}</Text>
-              <Text style={{ fontSize: 14 }}>Telp: {item.phone}</Text>
-              <View style={{ flexDirection: "row", alignItems: "center", marginTop: 5 }}>
-                <Text style={{ fontSize: 12, color: "#666", marginRight: 8 }}>
-                  {item.id}
-                </Text>
-                <Pressable onPress={copyId}>
-                  <MaterialCommunityIcons name="content-copy" size={18} color="#666" />
-                </Pressable>
+              <View style={{ marginTop: 4 }}>
+              
+                {/* Alamat */}
+                <View style={{ flexDirection: "row", marginBottom: 3 }}>
+                  <Text style={{ fontSize: 14, fontWeight: "600" }}>
+                    Alamat :
+                  </Text>
+                  <Text style={{ fontSize: 14, marginLeft: 3 }}>
+                    {item.address}
+                  </Text>
+                </View>
+
+                {/* Telepon */}
+                <View style={{ flexDirection: "row", marginBottom: 3 }}>
+                  <Text style={{ fontSize: 14, fontWeight: "600" }}>
+                    Telepon :
+                  </Text>
+                  <Text style={{ fontSize: 14, marginLeft: 3 }}>
+                    {item.phone}
+                  </Text>
+                </View>
+
+                {/* ID */}
+                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                  <Text
+                    style={{ fontSize: 12, color: "#666", marginRight: 8 }}
+                  >
+                    {item.id}
+                  </Text>
+                  <Pressable onPress={copyId}>
+                    <MaterialCommunityIcons
+                      name="content-copy"
+                      size={18}
+                      color="#666"
+                      style={{ marginTop: -3, marginLeft: -5 }}
+                    />
+                  </Pressable>
+                </View>
+
               </View>
             </>
           }
+          descriptionNumberOfLines={6}
           right={() => (
             <Pressable onPress={onOpenMenu} style={{ paddingHorizontal: 3 }}>
-              <MaterialCommunityIcons name="dots-vertical" size={24} color="#555" />
+              <MaterialCommunityIcons
+                name="dots-vertical"
+                size={24}
+                color="#555"
+              />
             </Pressable>
           )}
         />
 
+        {/* Popup Action Menu */}
         {isMenuVisible && (
           <>
+            {/* Overlay */}
             <Pressable
               onPress={onCloseMenu}
               style={{
@@ -82,7 +120,7 @@ const OutletItem = memo(
               }}
             />
 
-            {/* Popup */}
+            {/* Popup Box */}
             <Animated.View
               entering={ZoomIn}
               exiting={ZoomOut}
@@ -101,7 +139,6 @@ const OutletItem = memo(
                 shadowOffset: { width: 0, height: 4 },
               }}
             >
-              {/* Detail */}
               <Pressable
                 onPress={onDetail}
                 style={({ pressed }) => ({
@@ -121,7 +158,6 @@ const OutletItem = memo(
                 <Text style={{ fontSize: 15 }}>Detail</Text>
               </Pressable>
 
-              {/* Edit */}
               <Pressable
                 onPress={onEdit}
                 style={({ pressed }) => ({
@@ -150,13 +186,14 @@ const OutletItem = memo(
 
 export default function OutletListScreen() {
   const router = useRouter();
-  const pathname = usePathname();
+
+  const { rootBase: rootPath, basePath } = useBasePath();
 
   const list = useUniversalPaginatedList({
-    modul: "outlets",
-    pathname,
+    rootPath,
+    basePath,
     fetchFn: getOutletList,
-    defaultMode: "semua",
+    defaultMode: "name",
   });
 
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
@@ -180,16 +217,20 @@ export default function OutletListScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: "#f9f9f9" }}>
-      <AppHeaderList title="Daftar Outlet" onAdd={() => router.push("/outlets/add")} />
+
+      <AppHeaderList
+        title="Daftar Outlet"
+        onAdd={() => router.push("/outlets/add")}
+      />
 
       <AppSearchBarBottomSheet
         value={list.search}
         onChangeText={list.setSearch}
         mode={list.mode}
-       onChangeMode={(m) => list.setMode(m)}
-        placeholder="Cari outlet..."
-        categories={[{ label: "Semua", value: "semua" }]}
-        defaultMode="semua"
+        onChangeMode={(m) => list.setMode(m)}
+        placeholder="Cari nama outlet..."
+        categories={[{ label: "Nama", value: "name" }]}
+        defaultMode="name"
       />
 
       {list.loading && list.items.length === 0 && (
@@ -205,7 +246,10 @@ export default function OutletListScreen() {
         keyExtractor={(i) => i.id}
         renderItem={renderItem}
         refreshControl={
-          <RefreshControl refreshing={list.refreshing} onRefresh={list.onRefresh} />
+          <RefreshControl
+            refreshing={list.refreshing}
+            onRefresh={list.onRefresh}
+          />
         }
         onEndReachedThreshold={0.4}
         onEndReached={list.onEndReached}

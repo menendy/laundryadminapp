@@ -6,7 +6,7 @@ export interface PageAdminPayload {
   path: string;
   component: string;
   active: boolean;
-  is_public: boolean;
+
   canViewBy: string[];
   permission_type: { [key: string]: string };
 }
@@ -33,10 +33,11 @@ export interface PageUpdateAdminPayload {
   path: string;
   component: string;
   active: boolean;
-  is_public: boolean;
+
   canViewBy: string[];
   permission_type: { [key: string]: string };
   sync_permissions_diff: SyncPermissionsDiff;
+  useRole: boolean;
 }
 
 

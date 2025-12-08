@@ -1,16 +1,18 @@
 import React, { memo } from "react";
 import {
-  View, FlatList, RefreshControl, Keyboard, Text,
-  ToastAndroid, Platform, Pressable
+  View,
+  FlatList,
+  RefreshControl,
+  Keyboard,
+  Text,
+  ToastAndroid,
+  Platform,
+  Pressable,
 } from "react-native";
 import { Card, List, ActivityIndicator } from "react-native-paper";
 import Clipboard from "@react-native-clipboard/clipboard";
-
-import Animated, { ZoomIn, ZoomOut } from "react-native-reanimated";
-
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-
 
 import { getMitraList } from "../../services/api/mitraService";
 import AppHeaderList from "../../components/ui/AppHeaderList";
@@ -18,9 +20,11 @@ import AppSearchBarBottomSheet from "../../components/ui/AppSearchBarBottomSheet
 import { useUniversalPaginatedList } from "../../hooks/UniversalPaginatedList";
 import { useBasePath } from "../../utils/useBasePath";
 
-// Item Card
-const MitraItem = memo(({ item, activeMenuId, onOpenMenu, onCloseMenu, onView, onEdit }: any) => {
 
+// ================================
+// ITEM COMPONENT (Updated)
+// ================================
+const MitraItem = memo(({ item, onEdit }: any) => {
   const copyId = () => {
     Clipboard.setString(item.id);
     if (Platform.OS === "android") {
@@ -28,11 +32,8 @@ const MitraItem = memo(({ item, activeMenuId, onOpenMenu, onCloseMenu, onView, o
     }
   };
 
-  const isMenuVisible = activeMenuId === item.id;
-
   return (
     <Card
-      onPress={onOpenMenu}
       style={{
         backgroundColor: "#fff",
         borderRadius: 16,
@@ -47,15 +48,21 @@ const MitraItem = memo(({ item, activeMenuId, onOpenMenu, onCloseMenu, onView, o
         titleStyle={{ marginBottom: 6, fontWeight: "bold", fontSize: 17 }}
         description={() => (
           <View style={{ marginTop: 4 }}>
-
             <View style={{ flexDirection: "row", marginBottom: 2 }}>
               <MaterialCommunityIcons name="email" size={16} color="#999" />
-              <Text style={{ fontSize: 12, color: "#666", marginRight: 8, marginLeft: 5, }}>
+              <Text
+                style={{
+                  fontSize: 12,
+                  color: "#666",
+                  marginRight: 8,
+                  marginLeft: 5,
+                }}
+              >
                 {item.email}
               </Text>
             </View>
 
-            {/* Status Aktif / Nonaktif */}
+            {/* Status Aktif */}
             <View style={{ flexDirection: "row", marginBottom: 2 }}>
               <MaterialCommunityIcons
                 name={item.active ? "check-circle" : "close-circle"}
@@ -67,13 +74,33 @@ const MitraItem = memo(({ item, activeMenuId, onOpenMenu, onCloseMenu, onView, o
                   fontSize: 12,
                   color: item.active ? "green" : "red",
                   fontWeight: "600",
-                  marginLeft: 5
+                  marginLeft: 5,
                 }}
               >
                 {item.active ? "Aktif" : "Nonaktif"}
               </Text>
             </View>
 
+            {/* Status Transfer */}
+            {item.status === "transfer" && (
+              <View style={{ flexDirection: "row", marginBottom: 2 }}>
+                <MaterialCommunityIcons
+                  name="swap-horizontal"
+                  size={16}
+                  color="#d97706"
+                />
+                <Text
+                  style={{
+                    fontSize: 12,
+                    color: "#d97706",
+                    fontWeight: "600",
+                    marginLeft: 5,
+                  }}
+                >
+                  Status Mitra: Transfer
+                </Text>
+              </View>
+            )}
 
             {/* Copy ID */}
             <View style={{ flexDirection: "row", alignItems: "center" }}>
@@ -89,106 +116,30 @@ const MitraItem = memo(({ item, activeMenuId, onOpenMenu, onCloseMenu, onView, o
                 />
               </Pressable>
             </View>
-
           </View>
         )}
         descriptionNumberOfLines={6}
         right={() => (
-          <Pressable onPress={onOpenMenu} style={{ paddingHorizontal: 3 }}>
-            <MaterialCommunityIcons name="dots-vertical" size={24} color="#555" />
+          <Pressable onPress={() => onEdit(item)} style={{ paddingHorizontal: 3 }}>
+            <MaterialCommunityIcons
+              name="chevron-right"
+              size={28}
+              color="#1976d2"
+            />
           </Pressable>
         )}
       />
-
-
-      {/* Popup */}
-      {isMenuVisible && (
-        <>
-          {/* Overlay */}
-          <Pressable
-            onPress={onCloseMenu}
-            style={{
-              position: "absolute",
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              backgroundColor: "transparent",
-            }}
-          />
-
-          {/* Animated Popup Box */}
-          <Animated.View
-            entering={ZoomIn}
-            exiting={ZoomOut}
-            style={{
-              position: "absolute",
-              top: 10,
-              right: 10,
-              backgroundColor: "#fff",
-              borderRadius: 14,
-              paddingVertical: 10,
-              width: 160,
-              elevation: 12,
-              shadowColor: "#000",
-              shadowOpacity: 0.18,
-              shadowRadius: 8,
-              shadowOffset: { width: 0, height: 4 },
-            }}
-          >
-            {/* Lihat */}
-            <Pressable
-              onPress={() => onView(item)}
-              style={({ pressed }) => ({
-                flexDirection: "row",
-                alignItems: "center",
-                paddingVertical: 12,
-                paddingHorizontal: 14,
-                backgroundColor: pressed ? "#f1f5f9" : "transparent",
-              })}
-            >
-              <MaterialCommunityIcons
-                name="eye-outline"
-                size={22}
-                color="#1976d2"
-                style={{ marginRight: 12 }}
-              />
-              <Text style={{ fontSize: 15 }}>Lihat</Text>
-            </Pressable>
-
-            {/* Edit */}
-            <Pressable
-              onPress={() => onEdit(item)}
-              style={({ pressed }) => ({
-                flexDirection: "row",
-                alignItems: "center",
-                paddingVertical: 12,
-                paddingHorizontal: 14,
-                backgroundColor: pressed ? "#f1f5f9" : "transparent",
-              })}
-            >
-              <MaterialCommunityIcons
-                name="pencil-outline"
-                size={22}
-                color="#1976d2"
-                style={{ marginRight: 12 }}
-              />
-              <Text style={{ fontSize: 15 }}>Edit</Text>
-            </Pressable>
-          </Animated.View>
-        </>
-      )}
     </Card>
   );
-
 });
 
 
-
+// ================================
+// MAIN SCREEN
+// ================================
 export default function KaryawanListScreen() {
   const router = useRouter();
   const { rootBase: rootPath, basePath } = useBasePath();
-
 
   const list = useUniversalPaginatedList<any, "nama" | "telp" | "email">({
     rootPath,
@@ -197,35 +148,22 @@ export default function KaryawanListScreen() {
     defaultMode: "nama",
   });
 
-
-  const [activeMenuId, setActiveMenuId] = React.useState<string | null>(null);
-
   const renderItem = ({ item }: any) => (
-    <MitraItem
-      item={item}
-      activeMenuId={activeMenuId}
-      onOpenMenu={() => setActiveMenuId(item.id)}
-      onCloseMenu={() => setActiveMenuId(null)}
-      onView={(i: any) => {
-        setActiveMenuId(null);
-        router.push(`/karyawan/${i.id}`);
-      }}
-      onEdit={(i: any) => {
-        setActiveMenuId(null);
-        router.push(`/karyawan/edit/${i.id}`);
-      }}
-    />
+    <MitraItem item={item} onEdit={(i: any) => router.push(`/karyawan/edit2/${i.id}`)} />
   );
 
   return (
     <View style={{ flex: 1, backgroundColor: "#f9f9f9" }}>
-      <AppHeaderList title="Daftar Mitra" onAdd={() => router.push("/karyawan/add")} />
+      <AppHeaderList
+        title="Daftar Mitra"
+        onAdd={() => router.push("/karyawan/add")}
+      />
 
       <AppSearchBarBottomSheet
         value={list.search}
         onChangeText={list.setSearch}
         mode={list.mode}
-        onChangeMode={list.setMode}
+        onChangeMode={(m) => list.setMode(m)}
         categories={[
           { label: "Nama", value: "nama" },
           { label: "Telp", value: "telp" },
@@ -242,12 +180,14 @@ export default function KaryawanListScreen() {
       <FlatList
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingBottom: 100 }}
-        scrollEnabled={true}
         data={list.items}
         keyExtractor={(i) => i.id}
         renderItem={renderItem}
         refreshControl={
-          <RefreshControl refreshing={list.refreshing} onRefresh={list.onRefresh} />
+          <RefreshControl
+            refreshing={list.refreshing}
+            onRefresh={list.onRefresh}
+          />
         }
         onEndReachedThreshold={0.4}
         onEndReached={list.onEndReached}

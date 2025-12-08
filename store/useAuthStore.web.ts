@@ -1,5 +1,5 @@
+// C:\Users\WIN10\laundryadminapp\store\useAuthStore.web.ts
 import { create } from "zustand";
-import { Storage } from "./storage";
 
 interface AuthState {
   user: any | null;
@@ -8,8 +8,11 @@ interface AuthState {
 
   login: (user: any, tenant: string) => void;
   logout: () => void;
-  hydrate: () => Promise<void>;
+  hydrate: () => void;
 }
+
+const USER_KEY = "auth-user";
+const TENANT_KEY = "auth-tenant";
 
 export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
@@ -18,24 +21,62 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   login: (user, tenant) => {
     set({ user, activeTenant: tenant });
-    Storage.setItem("auth-user", JSON.stringify(user));
-    Storage.setItem("auth-tenant", tenant);
+
+    if (typeof window !== "undefined") {
+      try {
+        window.localStorage.setItem(USER_KEY, JSON.stringify(user));
+        window.localStorage.setItem(TENANT_KEY, tenant);
+      } catch (err) {
+        console.error("[AuthStore.web] Failed to persist auth", err);
+      }
+    }
   },
 
   logout: () => {
     set({ user: null, activeTenant: null });
-    Storage.removeItem("auth-user");
-    Storage.removeItem("auth-tenant");
+
+    if (typeof window !== "undefined") {
+      try {
+        window.localStorage.removeItem(USER_KEY);
+        window.localStorage.removeItem(TENANT_KEY);
+      } catch (err) {
+        console.error("[AuthStore.web] Failed to clear auth", err);
+      }
+    }
   },
 
-  hydrate: async () => {
-    const rawUser = await Storage.getItem("auth-user");
-    const rawTenant = await Storage.getItem("auth-tenant");
+  // Dipanggil sekali dari AppInitializer
+  hydrate: () => {
+    // Biar aman kalau kepanggil 2x
+    if (get().isHydrated) return;
 
-    set({
-      user: rawUser ? JSON.parse(rawUser) : null,
-      activeTenant: rawTenant ?? null,
-      isHydrated: true,
-    });
+    if (typeof window === "undefined") {
+      // Di server (kalau ada), langsung tandai hydrated
+      set({ isHydrated: true });
+      return;
+    }
+
+    try {
+      const rawUser = window.localStorage.getItem(USER_KEY);
+      const rawTenant = window.localStorage.getItem(TENANT_KEY);
+
+      set({
+        user: rawUser ? JSON.parse(rawUser) : null,
+        activeTenant: rawTenant ?? null,
+        isHydrated: true,
+      });
+
+      console.log("[AuthStore.web] Hydrated", {
+        hasUser: !!rawUser,
+        tenant: rawTenant,
+      });
+    } catch (err) {
+      console.error("[AuthStore.web] Failed to hydrate auth", err);
+      set({
+        user: null,
+        activeTenant: null,
+        isHydrated: true,
+      });
+    }
   },
 }));

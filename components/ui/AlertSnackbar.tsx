@@ -7,6 +7,7 @@ import {
   Easing,
   Platform,
   StatusBar,
+  TouchableWithoutFeedback,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -14,7 +15,7 @@ interface AlertSnackbarProps {
   visible: boolean;
   message: string;
   onDismiss: () => void;
-  type?: "success" | "error" | "info";
+  type?: "success" | "error" | "info" | "info-blocking";
 }
 
 export default function AlertSnackbar({
@@ -27,14 +28,20 @@ export default function AlertSnackbar({
   const translateY = useRef(new Animated.Value(-120)).current;
   const opacity = useRef(new Animated.Value(0)).current;
 
+  const isBlocking = type === "info-blocking";
+
   const bgColor =
     type === "success"
       ? "#4CAF50"
       : type === "error"
       ? "#F44336"
+      : type === "info-blocking"
+      ? "#FFC107" // 🟨 Warning color
       : "#2196F3";
 
   useEffect(() => {
+    let timer: any;
+
     if (visible) {
       Animated.parallel([
         Animated.timing(translateY, {
@@ -50,8 +57,9 @@ export default function AlertSnackbar({
         }),
       ]).start();
 
-      const timer = setTimeout(() => onDismiss(), 3000);
-      return () => clearTimeout(timer);
+      if (!isBlocking) {
+        timer = setTimeout(() => onDismiss(), 3000);
+      }
     } else {
       Animated.parallel([
         Animated.timing(translateY, {
@@ -67,30 +75,31 @@ export default function AlertSnackbar({
         }),
       ]).start();
     }
+
+    return () => clearTimeout(timer);
   }, [visible]);
 
-  // Dinamis offset (agar tidak tertutup status bar)
   const topOffset =
     Platform.OS === "android"
       ? (StatusBar.currentHeight ?? 24) + 10
       : insets.top + 10;
 
   return (
-    <Animated.View
-      pointerEvents="none"
-      style={[
-        styles.container,
-        {
-          transform: [{ translateY }],
-          opacity,
-          top: topOffset,
-        },
-      ]}
+    <TouchableWithoutFeedback
+      onPress={isBlocking ? onDismiss : undefined} // ⬅ TAP OUTSIDE to dismiss (only for blocking)
     >
-      <View style={[styles.snackbar, { backgroundColor: bgColor }]}>
-        <Text style={styles.text}>{message}</Text>
-      </View>
-    </Animated.View>
+      <Animated.View
+        pointerEvents="box-none"
+        style={[
+          styles.container,
+          { transform: [{ translateY }], opacity, top: topOffset },
+        ]}
+      >
+        <View style={[styles.snackbar, { backgroundColor: bgColor }]}>
+          <Text style={styles.text}>{message}</Text>
+        </View>
+      </Animated.View>
+    </TouchableWithoutFeedback>
   );
 }
 

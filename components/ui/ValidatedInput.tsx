@@ -1,10 +1,11 @@
 import React from "react";
 import { View, Text, TextInput, StyleSheet, TextInputProps } from "react-native";
 
-interface ValidatedInputProps extends TextInputProps {
+export interface ValidatedInputProps extends TextInputProps {
   label: string;
   required?: boolean;
   error?: string;
+  prefix?: React.ReactNode;
 }
 
 export default function ValidatedInput({
@@ -12,21 +13,47 @@ export default function ValidatedInput({
   required = false,
   error,
   style,
+  prefix,
+  editable = true,
   ...props
 }: ValidatedInputProps) {
   return (
-    <View style={{ marginBottom: 12 }}>
+    <View style={{ marginBottom: 14 }}>
       <Text style={styles.label}>
-        {label} {required && <Text style={styles.required}>*</Text>}
+        {label}
+        {required && <Text style={styles.required}>*</Text>}
       </Text>
 
-      <TextInput
-        style={[styles.input, error && styles.inputError, style]}
-        placeholderTextColor="#aaa"
-        {...props}
-      />
+      <View
+        style={[
+          styles.inputWrapper,
+          error && styles.inputError,
+          !editable && styles.disabledWrapper,
+        ]}
+      >
+        {prefix && (
+          <View style={styles.prefixWrapper}>
+            {typeof prefix === "string" || typeof prefix === "number" ? (
+              <Text>{prefix}</Text>
+            ) : (
+              prefix
+            )}
+          </View>
+        )}
 
-      {error && <Text style={styles.errorText}>{error}</Text>}
+        <TextInput
+          style={[
+            styles.input,
+            style,
+            !editable && styles.disabledText,
+          ]}
+          placeholderTextColor="#999"
+          editable={editable}
+          {...props}
+        />
+      </View>
+
+      {error ? <Text style={styles.errorText}>{error}</Text> : null}
     </View>
   );
 }
@@ -36,17 +63,41 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "500",
     color: "#333",
-    marginBottom: 4,
+    marginBottom: 6,
   },
   required: {
     color: "red",
   },
-  input: {
+  inputWrapper: {
+    flexDirection: "row",
+    alignItems: "center",
     borderWidth: 1,
     borderColor: "#ccc",
-    borderRadius: 6,
-    padding: 10,
+    borderRadius: 8,
     backgroundColor: "#fff",
+    overflow: "hidden",
+  },
+  disabledWrapper: {
+    backgroundColor: "#e5e5e5",
+    borderColor: "#bbb",
+  },
+  prefixWrapper: {
+    paddingHorizontal: 14,
+    backgroundColor: "#eee",
+    justifyContent: "center",
+    alignItems: "center",
+    borderRightWidth: 1,
+    borderRightColor: "#ccc",
+    height: "100%",
+  },
+  input: {
+    flex: 1,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    fontSize: 16,
+  },
+  disabledText: {
+    color: "#666",
   },
   inputError: {
     borderColor: "#F44336",

@@ -1,6 +1,6 @@
 // C:\Users\WIN10\laundryadminapp\app\_layout.tsx
 import React, { useEffect } from "react";
-import { View, Platform, useWindowDimensions, Animated, Text } from "react-native";
+import { View, Platform, useWindowDimensions, Animated, Text, Pressable } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { MD3LightTheme as DefaultTheme, PaperProvider } from "react-native-paper";
 import { Stack } from "expo-router";
@@ -13,6 +13,9 @@ import OfflineBanner from "../components/ui/OfflineBanner";
 
 import { useSnackbarStore } from "../store/useSnackbarStore";
 import { useAuthStore } from "../store/useAuthStore";
+
+import { useSegments } from "expo-router";
+
 
 
 
@@ -103,6 +106,12 @@ export default function Layout() {
     }).start(() => setDrawerOpen(false));
   };
 
+  const segments = useSegments();
+
+  // Jika berada di /pages_admin/add => sembunyikan bottom nav
+  const hideBottomNav =
+    segments.includes("pages_admin") && segments.includes("add");
+
   return (
     <SafeAreaProvider>
       <PaperProvider theme={theme}>
@@ -111,12 +120,28 @@ export default function Layout() {
 
           {/* HYDRATION WRAPPER */}
           <AppInitializer>
-            <AlertSnackbar
-              visible={snackbar.visible}
-              message={snackbar.message}
-              onDismiss={snackbar.hideSnackbar}
-              type={snackbar.type}
-            />
+           {/* Handler Tap-to-dismiss for info-blocking */}
+{snackbar.visible && snackbar.type === "info-blocking" && (
+  <Pressable
+    style={{
+      position: "absolute",
+      top: 0,
+      bottom: 0,
+      left: 0,
+      right: 0,
+      zIndex: 999998, // Di bawah snackbar, di atas UI lain
+    }}
+    onPress={snackbar.hideSnackbar}
+  />
+)}
+
+<AlertSnackbar
+  visible={snackbar.visible}
+  message={snackbar.message}
+  onDismiss={snackbar.hideSnackbar}
+  type={snackbar.type}
+/>
+
 
             <View style={{ flex: 1, backgroundColor: "#f6f7f8" }}>
               {/* Hidden drawer width calc */}
@@ -129,7 +154,7 @@ export default function Layout() {
                     if (drawerWidth !== w) setDrawerWidth(w);
                   }}
                 >
-                  <DrawerMenu onClose={() => {}} onMenuTreeChange={() => setOpenMapVersion((prev) => prev + 1)} />
+                  <DrawerMenu onClose={() => { }} onMenuTreeChange={() => setOpenMapVersion((prev) => prev + 1)} />
                 </View>
               )}
 
@@ -180,9 +205,11 @@ export default function Layout() {
                 <Stack screenOptions={{ headerShown: false }} />
               </Animated.View>
 
-              <View style={{ position: "absolute", bottom: 0, left: 0, right: 0, zIndex: 100 }}>
-                <BottomNav onMenuPress={openDrawer} onMenuClose={closeDrawer} isDrawerOpen={isDrawerOpen} />
-              </View>
+              {!hideBottomNav && (
+                <View style={{ position: "absolute", bottom: 0, left: 0, right: 0, zIndex: 100 }}>
+                  <BottomNav onMenuPress={openDrawer} onMenuClose={closeDrawer} isDrawerOpen={isDrawerOpen} />
+                </View>
+              )}
             </View>
           </AppInitializer>
         </GestureHandlerRootView>

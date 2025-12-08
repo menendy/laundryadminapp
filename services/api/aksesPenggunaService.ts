@@ -18,11 +18,11 @@ export const addAksesPengguna = async (payload: AksesPenggunaPayload) => {
 export const getPagesAdminListAll = async (): Promise<any[]> => {
 
   try {
-    
+
     const params = new URLSearchParams();
-    
+
     const res = await api.get(`/getPagesAdminListAll?${params.toString()}`);
-     return res.data?.data ?? []; 
+    return res.data?.data ?? [];
 
   } catch (err) {
     console.error("❌ getPagesAdminListAll error:", err);
@@ -75,14 +75,7 @@ export interface PermissionItem {
 // =============================
 export const getAksesPenggunaById = async (roleId: string, rootPath: string, basePath: string) => {
   //const normalizedPath = pagePath;
-  const res = await api.get("/getAksesPenggunaById", {
-    params: {
-      roleId,
-      rootPath,
-      basePath
-    }
-  });
-
+  const res = await api.get("/getAksesPenggunaById", { params: { roleId, rootPath, basePath } });
   return res.data?.data ?? null;
 };
 

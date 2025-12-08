@@ -40,7 +40,18 @@ export default function AppHeaderActions({
       {showBack && (
         <Appbar.BackAction
           color={color}
-          onPress={onBackPress || (() => router.canGoBack() && router.back())}
+          onPress={
+  onBackPress ||
+  (() => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      // fallback ke parent route
+      router.replace("../");
+    }
+  })
+}
+
         />
       )}
 

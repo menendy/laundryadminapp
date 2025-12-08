@@ -4,11 +4,7 @@ import { api } from "./client";
    PAYLOAD untuk tambah outlet
 -------------------------------------------*/
 export interface OutletPayload {
-  owner_id: string;
-  group_id: string;
-  name: string;
-  address: string;
-  phone: string;
+
 }
 
 /* ------------------------------------------
@@ -38,25 +34,24 @@ export interface OutletListResponse {
 
 
 export const getOutletList = async (
-  modul: string,
-  pagePath: string,
+  rootPath: string,
+  basePath: string,
   search: string | null = null,
   cursor: string | null = null,
   limit = 10,
-  mode: "semua" | "name" | "path" | "component" = "semua"
+  mode: "name" = "name"
 ): Promise<OutletListResponse> => {
 
-  const params = new URLSearchParams();
+ const params = new URLSearchParams();
 
-  params.append("modul", modul);
-  params.append("path", pagePath);
+  params.append("rootPath", rootPath);
+  params.append("basePath", basePath);
 
   if (search) params.append("search", search);
   if (cursor) params.append("cursor", cursor);
 
   params.append("limit", limit.toString());
   params.append("mode", mode);
-
   const res = await api.get(`/getOutletList?${params.toString()}`);
   return res.data;     // 🟢 jika success langsung return
 };
@@ -118,4 +113,21 @@ export const getOutletsByUser = async (
 
   const res = await api.get(`/getOutletUser?${params.toString()}`);
   return res.data;     // 🟢 jika success langsung return
+};
+
+export const getOutletById = async (id: string,rootPath: string, basePath: string) => {
+   const res = await api.get("/getOutletDetail", { params: {id,rootPath,basePath} });
+ return res.data?.data ?? null;
+};
+
+export interface OutletPayload {
+
+}
+
+export const updateOutlet = async (
+  id: string,
+  payload: OutletPayload
+) => {
+  const res = await api.put(`/updateOutlet?id=${id}`, payload);
+  return res.data;
 };

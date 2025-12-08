@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { View, ScrollView, Text, Pressable, Platform, Switch, Animated, TouchableOpacity } from "react-native";
-import { Button, Portal } from "react-native-paper";
+import { Button, Portal, Tooltip } from "react-native-paper";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 
@@ -11,6 +11,7 @@ import { useSnackbarStore } from "../../store/useSnackbarStore";
 import { handleBackendError } from "../../utils/handleBackendError";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import ToggleSwitch from "../../components/ui/ToggleSwitch";
+import CustomTooltip from "../../components/ui/CustomTooltip";
 
 
 
@@ -27,10 +28,12 @@ export default function AddPageAdminScreen() {
 
   const [active, setActive] = useState(true);
 
-  const [isPublic, setIsPublic] = useState(true);
+
 
 
   const [canViewBy, setcanViewBy] = useState(true);
+
+  const [useRole, setuseRole] = useState(false);
 
   const [errors, setErrors] = useState<any>({});
   const [loading, setLoading] = useState(false);
@@ -156,6 +159,12 @@ export default function AddPageAdminScreen() {
     return Object.keys(e).length === 0;
   };
 
+  useEffect(() => {
+    if (!useRole) {
+      setPermissionModalVisible(false);
+    }
+  }, [useRole]);
+
   const handleSubmit = async () => {
     // ===== FRONTEND VALIDATION =====
     if (!validate()) { showSnackbar("Lengkapi data dengan benar", "error"); return; }
@@ -170,9 +179,9 @@ export default function AddPageAdminScreen() {
         path: path.trim(),
         component: component.trim(),
         active,
-        is_public: isPublic, 
-  canViewBy: isPublic ? [] : (canViewBy ? ["sysadmin"] : ["sysadmin", "owner"]),
-        permission_type,
+        canViewBy: (canViewBy ? ["sysadmin"] : ["sysadmin", "owner"]),
+        permission_type: permission_type, 
+        useRole: useRole,
       };
 
 
@@ -201,51 +210,6 @@ export default function AddPageAdminScreen() {
   };
 
 
-  const IOSSwitch = ({ value, onChange }: any) => {
-    const animated = React.useRef(new Animated.Value(value ? 1 : 0)).current;
-
-    React.useEffect(() => {
-      Animated.timing(animated, {
-        toValue: value ? 1 : 0,
-        duration: 180,
-        useNativeDriver: false,
-      }).start();
-    }, [value]);
-
-    const translate = animated.interpolate({
-      inputRange: [0, 1],
-      outputRange: [2, 22],
-    });
-
-    return (
-      <TouchableOpacity
-        activeOpacity={0.9}
-        onPress={() => onChange(!value)}
-        style={{
-          width: 46,
-          height: 28,
-          borderRadius: 20,
-          justifyContent: "center",
-          padding: 2,
-          backgroundColor: value ? "#34C759" : "#E5E5EA",
-        }}
-      >
-        <Animated.View
-          style={{
-            width: 24,
-            height: 24,
-            borderRadius: 12,
-            backgroundColor: "#fff",
-            shadowColor: "#000",
-            shadowOpacity: 0.2,
-            shadowRadius: 2,
-            transform: [{ translateX: translate }],
-          }}
-        />
-      </TouchableOpacity>
-    );
-  };
-
 
 
 
@@ -253,7 +217,14 @@ export default function AddPageAdminScreen() {
     <View style={{ flex: 1, backgroundColor: "#f9f9f9" }}>
       <AppHeaderActions title="Tambah Halaman Admin" showBack />
 
-      <ScrollView contentContainerStyle={{ padding: 20 }}>
+      <ScrollView
+        contentContainerStyle={{
+          padding: 20,
+          paddingBottom: 180, // ruang tambahan agar konten terakhir aman
+        }}
+        showsVerticalScrollIndicator={false}
+      >
+
         <ValidatedInput
           label="Nama Halaman"
           required
@@ -267,7 +238,12 @@ export default function AddPageAdminScreen() {
           label="Path Routing"
           required
           value={path}
-          onChangeText={setPath}
+          onChangeText={(v) => {
+            setPath(v);
+            if (errors.path || errors.perm) {
+              setErrors((prev: any) => ({ ...prev, path: null, perm: null }));
+            }
+          }}
           placeholder="/finance"
           error={errors.path}
         />
@@ -299,72 +275,116 @@ export default function AddPageAdminScreen() {
           )}
         </View>
 
-        {/* PUBLIC STATUS */}
-        <View style={{ marginTop: 20 }}>
-          <Text style={{ fontWeight: "700", marginBottom: 10 }}>
-            Halaman Publik ?
-          </Text>
-
-          <View style={{ flexDirection: "row", alignItems: "center" }}>
-            <ToggleSwitch value={isPublic} onChange={setIsPublic} />
-            <Text style={{ marginLeft: 10, fontSize: 15, fontWeight: "600" }}>
-              {isPublic ? "Ya" : "Tidak"}
-            </Text>
-          </View>
-
-          {errors.isPublic && (
-            <Text style={{ color: "red", marginTop: 6 }}>{errors.isPublic}</Text>
-          )}
-        </View>
 
 
 
 
-        {/* SYSADMIN */}
-        {!isPublic && (
-          <>
-            <Text style={{ marginTop: 20, fontWeight: "700" }}>
+
+
+        <>
+          {/* Only Sysadmin Access */}
+          <View style={{ flexDirection: "row", alignItems: "center", marginTop: 20 }}>
+            <Text style={{ fontWeight: "700" }}>
               Hanya bisa dilihat dan diedit sysadmin
             </Text>
 
-            <View style={{ marginTop: 12, flexDirection: "row", alignItems: "center", gap: 12 }}>
-              <ToggleSwitch value={canViewBy} onChange={setcanViewBy} />
-              <Text style={{ fontSize: 15, fontWeight: "600" }}>
-                {canViewBy ? "Ya" : "Tidak"}
-              </Text>
-            </View>
+            <CustomTooltip message="Akses halaman dibatasi hanya bisa di konfigurasi oleh role Sysadmin">
+              <Ionicons
+                name="help-circle-outline"
+                size={18}
+                color="#666"
+                style={{ marginLeft: 6 }}
+              />
+            </CustomTooltip>
+          </View>
 
-            {errors.canViewBy && (
-              <Text style={{ color: "red", marginTop: 6 }}>{errors.canViewBy}</Text>
+          <View style={{ marginTop: 12, flexDirection: "row", alignItems: "center" }}>
+            <ToggleSwitch value={canViewBy} onChange={setcanViewBy} />
+            <Text style={{ marginLeft: 10, fontSize: 15, fontWeight: "600" }}>
+              {canViewBy ? "Ya" : "Tidak"}
+            </Text>
+          </View>
+
+          {errors.canViewBy && (
+            <Text style={{ color: "red", marginTop: 6 }}>{errors.canViewBy}</Text>
+          )}
+
+          {/* Role-Based Access */}
+          <View style={{ flexDirection: "row", alignItems: "center", marginTop: 20 }}>
+            <Text style={{ fontWeight: "700" }}>
+              Perlu pengaturan Role ?
+            </Text>
+
+            <CustomTooltip message="Akses pengguna dapat ditentukan berdasarkan role yang dimiliki.">
+              <Ionicons
+                name="help-circle-outline"
+                size={18}
+                color="#666"
+                style={{ marginLeft: 6 }}
+              />
+            </CustomTooltip>
+          </View>
+
+          <View style={{ marginTop: 12, flexDirection: "row", alignItems: "center" }}>
+            <ToggleSwitch value={useRole} onChange={setuseRole} />
+            <Text style={{ marginLeft: 10, fontSize: 15, fontWeight: "600" }}>
+              {useRole ? "Ya" : "Tidak"}
+            </Text>
+          </View>
+
+          {errors.canViewBy && (
+            <Text style={{ color: "red", marginTop: 6 }}>{errors.canViewBy}</Text>
+          )}
+        </>
+
+
+
+
+
+
+        {/* OPEN PERMISSION MODAL — only if useRole enabled */}
+        {useRole && (
+          <>
+            <Pressable
+              onPress={() => {
+                if (!path.trim()) {
+                  setErrors((prev: any) => ({
+                    ...prev,
+                    perm: "Isi Path Routing terlebih dahulu",
+                  }));
+                  showSnackbar("Isi Path Routing terlebih dahulu", "error");
+                  return;
+                }
+
+                setErrors((prev: any) => ({ ...prev, perm: null }));
+                setPermissionModalVisible(true);
+              }}
+              style={{
+                marginTop: 30,
+                paddingVertical: 4,
+                flexDirection: "row",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <Text style={{ fontWeight: "700", fontSize: 16 }}>
+                Tipe Permission
+              </Text>
+              <Ionicons name="chevron-forward" size={22} color="#333" />
+            </Pressable>
+
+            {permissionList.length > 0 && (
+              <Text style={{ color: "#666", marginTop: 4 }}>
+                {permissionList.length} izin dibuat
+              </Text>
+            )}
+
+            {errors.perm && (
+              <Text style={{ color: "red" }}>{errors.perm}</Text>
             )}
           </>
         )}
 
-
-        {/* OPEN PERMISSION MODAL */}
-        <Pressable
-          onPress={() => setPermissionModalVisible(true)}
-          style={{
-            marginTop: 30,
-            paddingVertical: 4,
-            flexDirection: "row",
-            justifyContent: "space-between",
-            alignItems: "center",
-          }}
-        >
-          <Text style={{ fontWeight: "700", fontSize: 16 }}>
-            Tipe Permission
-          </Text>
-          <Ionicons name="chevron-forward" size={22} color="#333" />
-        </Pressable>
-
-        {permissionList.length > 0 && (
-          <Text style={{ color: "#666", marginTop: 4 }}>
-            {permissionList.length} izin dibuat
-          </Text>
-        )}
-
-        {errors.perm && <Text style={{ color: "red" }}>{errors.perm}</Text>}
 
         <Button
           mode="contained"
@@ -420,7 +440,7 @@ export default function AddPageAdminScreen() {
             <ScrollView
               contentContainerStyle={{
                 padding: 20,
-                paddingBottom: 160,
+                paddingBottom: useRole ? 260 : 180,
               }}
             >
               <Button mode="contained" onPress={addPermissionRow}>

@@ -70,3 +70,32 @@ export const addMitra = async (payload: MitraPayload) => {
   const res = await api.post("/addMitra_v2", payload);
   return res.data;
 };
+
+
+export const getMitraById = async (id: string,rootPath: string, basePath: string) => {
+ const res = await api.get("/getMitraDetail", { params: {id,rootPath,basePath} });
+ return res.data?.data ?? null;
+};
+
+
+
+export interface MitraPayload {
+
+}
+
+export const updateMitra = async (
+  id: string,
+  payload: MitraPayload
+) => {
+  const res = await api.put(`/updateMitra?id=${id}`, payload);
+  return res.data;
+};
+
+
+export const updateMitraV2 = async (
+  id: string,
+  payload: MitraPayload
+) => {
+  const res = await api.put(`/updateMitrav2?id=${id}`, payload);
+  return res.data;
+};

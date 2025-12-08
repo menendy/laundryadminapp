@@ -90,7 +90,7 @@ export default function ProfilAkun() {
         <Text style={styles.editPhotoText}>Ubah</Text>
       </View>
 
-  
+
       {/* SECTION 1 → OUTLET */}
       <View style={styles.sectionCard}>
         <List.Item
@@ -110,75 +110,113 @@ export default function ProfilAkun() {
 
       {/* SECTION 1 → Nama + Bio */}
       <View style={styles.sectionCard}>
+
         <List.Item
           title="Nama"
-          right={() => (
-            <RightValue text={profile.name || "Atur Sekarang"} />
-          )}
-          onPress={() => router.push("/profil/editNama")}
-          android_ripple={{ color: "transparent" }}
+          right={() => <RightValue text={profile.name || "Atur Sekarang"} />}
+          onPress={() =>
+            router.push({
+              pathname: "/profil/modal/[field]",
+              params: {
+                field: "name",
+                label: "Nama",
+                value: profile.name,
+              },
+            })
+          }
         />
+
         <View style={styles.divider} />
+
         <List.Item
-          title="Bio"
-          right={() => (
-            <RightValue text={profile.bio || "Atur Sekarang"} />
-          )}
-          onPress={() => router.push("/profil/editBio")}
-          android_ripple={{ color: "transparent" }}
+          title="Alamat"
+          right={() => <RightValue text={profile.address || "Atur Sekarang"} />}
+          onPress={() =>
+            router.push({
+              pathname: "/profil/modal/[field]",
+              params: {
+                field: "address",
+                label: "Alamat",
+                value: profile.address,
+              },
+            })
+          }
         />
+
       </View>
 
       {/* SECTION 2 → Jenis Kelamin + Tanggal Lahir */}
       <View style={styles.sectionCard}>
         <List.Item
-          title="Jenis Kelamin"
-          right={() => (
-            <RightValue
-              text={profile.gender || "Atur Sekarang"}
-              warning={!profile.gender}
-            />
-          )}
-          onPress={() => router.push("/profil/editGender")}
-          android_ripple={{ color: "transparent" }}
+          title=" Jenis Kelamin"
+          right={() => <RightValue text={profile.address || "Atur Sekarang"} />}
+          onPress={() =>
+            router.push({
+              pathname: "/profil/modal/[field]",
+              params: {
+                field: "gender",
+                label: "Jenis Kelamin",
+                value: profile.gender,
+              },
+            })
+          }
         />
+
         <View style={styles.divider} />
+
         <List.Item
-          title="Tanggal Lahir"
-          right={() => (
-            <RightValue
-              text={profile.birthday || "**/**/****"}
-              warning={!profile.birthday}
-            />
-          )}
-          onPress={() => router.push("/profil/editBirthday")}
-          android_ripple={{ color: "transparent" }}
+          title=" Tanggal Lahir"
+          right={() => <RightValue text={profile.birthday || "Atur Sekarang"} />}
+          onPress={() =>
+            router.push({
+              pathname: "/profil/modal/[field]",
+              params: {
+                field: "birthday",
+                label: "Tanggal Lahir",
+                value: profile.birthday,
+              },
+            })
+          }
         />
+
       </View>
 
       {/* SECTION 3 → HP + Email */}
       <View style={styles.sectionCard}>
         <List.Item
           title="No. Handphone"
-          right={() => (
-            <RightValue
-              text={maskPhone(profile.phone) || "Atur Sekarang"}
-            />
-          )}
-          onPress={() => router.push("/profil/editPhone")}
-          android_ripple={{ color: "transparent" }}
+          right={() => <RightValue text={maskPhone(profile.phone) || "Atur Sekarang"} />}
+          onPress={() =>
+            router.push({
+              pathname: "/profil/modal/[field]",
+              params: {
+                field: "phone",
+                label: "No. Handphone",
+                value: profile.phone,
+              },
+            })
+          }
         />
+
+
         <View style={styles.divider} />
+
         <List.Item
           title="Email"
-          right={() => (
-            <RightValue
-              text={maskEmail(profile.email) || "Atur Sekarang"}
-            />
-          )}
-          onPress={() => router.push("/profil/editEmail")}
-          android_ripple={{ color: "transparent" }}
+          right={() => <RightValue text={maskEmail(profile.email) || "Atur Sekarang"} />}
+          onPress={() =>
+            router.push({
+              pathname: "/profil/modal/[field]",
+              params: {
+                field: "email",
+                label: "email",
+                value: profile.email,
+              },
+            })
+          }
         />
+
+
       </View>
 
       {/* Logout tanpa arrow */}

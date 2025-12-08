@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { View, ScrollView, Text, Pressable } from "react-native";
-import { Button, Checkbox } from "react-native-paper";
+import { Button, Checkbox, ActivityIndicator } from "react-native-paper";
 
 import { useRouter } from "expo-router";
 
@@ -12,6 +12,7 @@ import { getRoleListLite } from "../../services/api/rolesService";
 import { useSnackbarStore } from "../../store/useSnackbarStore";
 import { handleBackendError } from "../../utils/handleBackendError";
 import { useBasePath } from "../../utils/useBasePath";
+
 
 
 export default function AddKaryawanScreen() {
@@ -38,81 +39,115 @@ export default function AddKaryawanScreen() {
 
   const [errors, setErrors] = useState<any>({});
   const [loading, setLoading] = useState(false);
+  const [loadingRoles, setLoadingRoles] = useState(true);
+
 
   const validate = () => {
     const e: any = {};
 
-    if (!nama.trim()) e.nama = "Nama tidak boleh kosong";
-    if (!telp.trim()) e.telp = "Nomor Telepon tidak boleh kosong";
-    if (!alamat.trim()) e.alamat = "Alamat tidak boleh kosong";
+    if (!nama.trim()) e.name = "Nama tidak boleh kosong";
+    if (!telp.trim()) e.phone = "Nomor Telepon tidak boleh kosong";
+    if (!alamat.trim()) e.address = "Alamat tidak boleh kosong";
 
-    if (assignRole && !roleId)
+
+    if (!password.trim()) e.password = "Password tidak boleh kosong";
+    if (!confirm.trim()) e.confirm = "Konfirmasi Password tidak boleh kosong";
+
+    if (password.trim() && confirm.trim() && password.trim() !== confirm.trim()) {
+      e.confirm = "Password tidak sama";
+    }
+
+    if (!alias.trim()) e.nama = "Nama panggilan tidak boleh kosong";
+
+    if (!email.trim()) e.email = "Email tidak boleh kosong";
+
+    if (assignRole && (!roleId || roleId.length === 0)) {
       e.roleId = "Pilih level akses terlebih dahulu";
+    }
 
     setErrors(e);
     return Object.keys(e).length === 0;
   };
 
+
   const loadRoles = async () => {
     try {
+      setLoadingRoles(true);
       const res = await getRoleListLite();
       if (res.success) {
-        setRoles(res.data.map((r: any) => ({
-          label: r.name,
-          value: r.id,
-        })));
+        setRoles(
+          res.data.map((r: any) => ({
+            label: r.name,
+            value: r.id,
+          }))
+        );
       }
     } catch (err) {
       console.error("loadRoles error:", err);
+    } finally {
+      setLoadingRoles(false);
     }
   };
 
+
   useEffect(() => {
-    if (assignRole) loadRoles();
-  }, [assignRole]);
+    loadRoles();
+  }, []);
 
-const handleSubmit = async () => {
-  if (!validate()) {
-    showSnackbar("Lengkapi data dengan benar", "error");
-    return;
+
+
+  const handleSubmit = async () => {
+    if (!validate()) {
+      showSnackbar("Lengkapi data dengan benar", "error");
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      const payload = {
+        name: nama.trim(),
+        alias: alias.trim(),
+        phone: telp.trim(),
+        address: alamat.trim(),
+        role_ids: assignRole ? roleId : null,
+        email: email.trim(),
+        password,
+        confirm,
+        rootPath,
+        basePath,
+      };
+
+      const result = await addMitra(payload);
+
+      // 🔥 Universal handler untuk RESPON backend
+      const ok = handleBackendError(result, setErrors, showSnackbar);
+      if (!ok) return;
+
+      showSnackbar("berhasil ditambahkan", "success");
+      //router.back();
+
+    } catch (err: any) {
+      console.error("🔥 Error addKaryawan:", err);
+
+      // 🔥 Pakai handler yang sama untuk NETWORK / AXIOS error
+      handleBackendError(err, setErrors, showSnackbar);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading || loadingRoles) {
+    return (
+      <View style={{ flex: 1, justifyContent: "center" }}>
+        <ActivityIndicator size="large" />
+      </View>
+    );
   }
 
-  try {
-    setLoading(true);
-
-    const payload = {
-      name: nama.trim(),
-      alias: alias.trim(),
-      phone: telp.trim(),
-      address: alamat.trim(),
-      role_ids: assignRole ? roleId : null,
-      email: email.trim(),
-      password,
-      confirm,
-      rootPath,
-      basePath,
-    };
-
-    const result = await addMitra(payload);
-
-    // 🔥 Universal handler untuk RESPON backend
-    const ok = handleBackendError(result, setErrors, showSnackbar);
-    if (!ok) return;
-
-    showSnackbar("Karyawan berhasil ditambahkan", "success");
-    router.back();
-
-  } catch (err: any) {
-    console.error("🔥 Error addKaryawan:", err);
-
-    // 🔥 Pakai handler yang sama untuk NETWORK / AXIOS error
-    handleBackendError(err, setErrors, showSnackbar);
-  } finally {
-    setLoading(false);
-  }
-};
 
   return (
+
     <View style={{ flex: 1, backgroundColor: "#f9f9f9" }}>
       <AppHeaderActions title="Tambah Karyawan" showBack />
 
@@ -163,11 +198,21 @@ const handleSubmit = async () => {
           label="Nomor Telepon"
           required
           keyboardType="phone-pad"
-          placeholder="contoh: 08123456789"
+          placeholder="812xxxxxxx"
           value={telp}
-          onChangeText={setTelp}
+          onChangeText={(v) => {
+            let clean = v.replace(/[^0-9]/g, "");
+
+            if (clean.startsWith("0")) clean = clean.substring(1);
+
+            // Jangan blokir update saat empty
+            setTelp(clean);
+          }}
           error={errors.phone}
+          prefix={<Text style={{ fontSize: 16, color: "#555" }}>+62</Text>}
         />
+
+
 
         <ValidatedInput
           label="Email"
@@ -241,12 +286,11 @@ const handleSubmit = async () => {
               }}
             />
 
-            {errors.role_ids && (
+            {errors.roleId && (
               <Text style={{ color: "red", marginTop: 4 }}>{errors.roleId}</Text>
             )}
           </View>
         )}
-
 
 
         <Button
@@ -258,7 +302,9 @@ const handleSubmit = async () => {
         >
           {loading ? "Menyimpan..." : "Tambah Karyawan"}
         </Button>
+
       </ScrollView>
     </View>
+
   );
 }

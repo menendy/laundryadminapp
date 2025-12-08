@@ -22,6 +22,8 @@ export default function EditOutletScreen() {
 
     const { rootBase: rootPath, basePath } = useBasePath();
 
+    
+
     const list = useUniversalPaginatedList({
         rootPath,
         basePath, // bisa disesuaikan bila butuh
@@ -74,14 +76,14 @@ export default function EditOutletScreen() {
             <View style={{ flexDirection: "row", alignItems: "center" }}>
                 <MaterialCommunityIcons name="account-check" size={16} color="#999" />
                 <Text style={{ fontSize: 12, marginLeft: 5, color: "#555" }}>
-                    {item.owner_name || "Owner belum diisi"}
+                    {item.user_name || "Owner belum diisi"}
                 </Text>
             </View>
 
             <View style={{ flexDirection: "row", alignItems: "center" }}>
                 <MaterialCommunityIcons name="email" size={16} color="#999" />
                 <Text style={{ fontSize: 12, marginLeft: 5, color: "#555" }}>
-                    {item.owner_email || "email belum diisi"}
+                    {item.user_email || "email belum diisi"}
                 </Text>
             </View>
 

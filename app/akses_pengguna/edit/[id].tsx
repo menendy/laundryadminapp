@@ -118,6 +118,7 @@ useEffect(() => {
         appAccess,
         active,
         permissions: formattedPermissions,
+        rootPath, basePath,
       };
 
       const result = await updateAksesPengguna(String(id), payload);
