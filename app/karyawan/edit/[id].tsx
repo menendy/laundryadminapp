@@ -1,36 +1,37 @@
 import React, { useState, useEffect } from "react";
 import { useFocusEffect } from "@react-navigation/native";
-import { View, StyleSheet, ScrollView } from "react-native";
-import { Text, List, ActivityIndicator, Button } from "react-native-paper";
+import { View, StyleSheet, ScrollView, Alert, Platform } from "react-native";
+import { ActivityIndicator, List } from "react-native-paper";
 import { useRouter, useLocalSearchParams, useGlobalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import AppHeaderActions from "../../../components/ui/AppHeaderActions";
-import { getMitraById, updateMitraV2 } from "../../../services/api/mitraService";
-import { useSnackbarStore } from "../../../store/useSnackbarStore";
+import SectionListCard from "../../../components/ui/SectionListCard";
 import ToggleSwitch from "../../../components/ui/ToggleSwitch";
-import { getRoleListLite } from "../../../services/api/rolesService";
+
+import { getMitraById, updateMitraV2, deleteMitraV2 } from "../../../services/api/mitraService";
+
+import { useSnackbarStore } from "../../../store/useSnackbarStore";
 import { useBasePath } from "../../../utils/useBasePath";
+import { handleBackendError } from "../../../utils/handleBackendError";
+import ConfirmBottomSheet from "../../../modals/ConfirmBottomSheet";
+
 
 export default function EditKaryawanScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<any>();
-  const searchParams = useGlobalSearchParams();
   const id = params.id;
   const showSnackbar = useSnackbarStore((s) => s.showSnackbar);
   const insets = useSafeAreaInsets();
   const { rootBase: rootPath, basePath } = useBasePath();
-  const [hasRefreshed, setHasRefreshed] = useState(false);
-
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-
   const [active, setActive] = useState(true);
-  const [assignRole, setAssignRole] = useState(false);
-  const [roleId, setRoleId] = useState<any[]>([]);
-  const [roles, setRoles] = useState<any[]>([]);
 
+
+  const [rolesAdmin, setRolesAdmin] = useState<string>("");
+  const [errors, setErrors] = useState<any>({});
   const [data, setData] = useState<any>({
     name: "",
     alias: "",
@@ -39,53 +40,46 @@ export default function EditKaryawanScreen() {
     address: "",
   });
 
-  const loadRoles = async () => {
-    const res = await getRoleListLite();
-    if (res.success) {
-      setRoles(res.data.map((r: any) => ({ label: r.name, value: r.id })));
-    }
-  };
+  const [confirmVisible, setConfirmVisible] = useState(false);
+  const [confirmDeleteVisible, setConfirmDeleteVisible] = useState(false);
+
+
+  const [pendingActiveValue, setPendingActiveValue] = useState(active);
+
+
 
   const loadData = async () => {
     try {
       const res = await getMitraById(id as string, rootPath, basePath);
-
       setData({
         name: res.name,
         alias: res.alias,
         phone: res.phone?.replace(/^(\+62|62)/, ""),
         email: res.email,
         address: res.alamat,
+        //roles : res.roleNameAdmin
       });
       setActive(res.active);
+      setRolesAdmin(res.roleNameAdmin);
 
-      if (res.role_ids?.length > 0) {
-        setAssignRole(true);
-        setRoleId(res.role_ids);
-        await loadRoles();
-      }
     } catch (err) {
-      showSnackbar("Gagal memuat data", "error");
+
+      console.error("🔥 Error add:", err);
+      handleBackendError(err, setErrors, showSnackbar);
+
     } finally {
       setLoading(false);
     }
   };
 
-
-  // Fetch data pertama kali masuk halaman
   useEffect(() => {
-    //console.log("INITIAL LOAD");
-    loadData(); // 1x saja saat buka pertama kali
+    loadData();
   }, [id]);
 
-  // Reload data ketika kembali dari modal
   useFocusEffect(
     React.useCallback(() => {
-      if (!loading) {
-        //console.log("FOCUS REFRESH (modal return)");
-        loadData(); // hanya reload ketika sudah tidak loading
-      }
-    }, [loading])
+      if (!loading) loadData();
+    }, [loading, saving])
   );
 
 
@@ -97,113 +91,264 @@ export default function EditKaryawanScreen() {
     );
   }
 
-  const section = (children: any) => (
-    <View style={styles.sectionCard}>{children}</View>
-  );
-
   const goEdit = (field: string, label: string, value: string) =>
     router.push({
-      pathname: "/karyawan/edit2/modal/[field]",
+      pathname: "/karyawan/edit/modal/[field]",
       params: { id, field, label, value, rootPath, basePath },
     });
 
+  const goEditAksesOps = () =>
+    router.push({
+      //pathname: "/karyawan/edit/modal/role",
+      pathname: "/karyawan/edit/modal/akses_ops",
+      params: { id, rootPath, basePath },
+    });
+
+  const goEditAksesAdmin = () =>
+    router.push({
+      //pathname: "/karyawan/edit/modal/role",
+      pathname: "/karyawan/edit/modal/akses_admin",
+      params: { id, rootPath, basePath },
+    });
+
+  const handleDelete = async () => {
+    try {
+      setSaving(true);
+      const payload = { rootPath, basePath };
+      const res = await deleteMitraV2(String(id), payload);
+      const ok = handleBackendError(res, setErrors, showSnackbar);
+      if (!ok) return false;
+
+      showSnackbar("Berhasil dihapus", "success");
+      return true;
+    } catch (err) {
+      handleBackendError(err, setErrors, showSnackbar);
+      return false;
+    } finally {
+      setSaving(false);
+    }
+  };
+
+
+  const handleUpdate = async (value: boolean) => {
+    try {
+      setSaving(true);
+      const payload = { active: value, rootPath, basePath };
+      const res = await updateMitraV2(String(id), payload);
+      const ok = handleBackendError(res, setErrors, showSnackbar);
+      if (!ok) return false;
+      showSnackbar("Status akun diperbarui", "success");
+      return true;
+    } catch (err) {
+      handleBackendError(err, setErrors, showSnackbar);
+      return false;
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
+
+    
+
     <View style={styles.container}>
-      <AppHeaderActions showBack title="Edit Karyawan" />
+      <AppHeaderActions showBack title="Data Mitra" />
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={{
+          paddingBottom: insets.bottom + 100,
+        }}
+        showsVerticalScrollIndicator={false}
+      >
+        <ConfirmBottomSheet
+          visible={confirmVisible}
+          title={pendingActiveValue ? "Aktifkan Akun?" : "Nonaktifkan Akun?"}
+          message={
+            pendingActiveValue
+              ? "Apakah Anda yakin ingin mengaktifkan akun mitra ini?"
+              : "Apakah Anda yakin ingin menonaktifkan akun mitra ini?"
+          }
+          confirmText="Ya, Lanjutkan"
+          cancelText="Batal"
+          onConfirm={async () => {
+            setConfirmVisible(false);
+            const prev = active;
+            setActive(pendingActiveValue);
+            const ok = await handleUpdate(pendingActiveValue);
+            // if (!ok) setActive(prev);
+          }}
+          onCancel={() => {
+            setConfirmVisible(false);
+            setActive(active); // pastikan revert UI
+          }}
+        />
 
-      <ScrollView contentContainerStyle={{ paddingTop: 20, paddingBottom: insets.bottom + 100 }}>
-        {/* STATUS */}
-        {section(
-          <>
-            <Text style={styles.sectionTitle}>Status Akun</Text>
-            <List.Item
-              title="Aktifkan Akun"
-              description={active ? "Aktif" : "Nonaktif"}
-              titleStyle={styles.itemTitle}
-              descriptionStyle={styles.itemValue}
-              right={() => <ToggleSwitch value={active} onChange={setActive} />}
-            />
-          </>
-        )}
+        <ConfirmBottomSheet
+          visible={confirmDeleteVisible}
+          title="Hapus Mitra?"
+          message="Apakah Anda yakin ingin menghapus mitra ini?"
+          confirmText="Ya, Hapus"
+          cancelText="Batal"
+          onConfirm={async () => {
+            setConfirmDeleteVisible(false);
 
-        {/* DATA PRIBADI */}
-        {section(
-          <>
-            <Text style={styles.sectionTitle}>Data Pribadi</Text>
-            {[
+            const prev = active; // simpan state lama untuk rollback jika perlu
+            try {
+              setSaving(true);
+
+              // panggil API delete
+              const ok = await handleDelete();
+              if (!ok) {
+                setActive(prev); // rollback UI kalau gagal
+                return;
+              }
+
+              showSnackbar("Berhasil dihapus", "success");
+
+              // kembali ke halaman daftar
+              router.replace("/karyawan");
+            } catch (err) {
+              handleBackendError(err, setErrors, showSnackbar);
+              setActive(prev);
+            } finally {
+              setSaving(false);
+            }
+          }}
+
+          onCancel={() => {
+            setConfirmDeleteVisible(false);
+          }}
+        />
+
+
+        <View style={styles.body}>
+
+          <SectionListCard
+            style={{ marginTop: 16 }}  // ⬅️ spacing di bagian atas
+            title="Status Akun Mitra"
+            items={[
+              {
+                label: "Status",
+                value: active ? "Aktif" : "Nonaktif",
+                right: () => (
+                  <ToggleSwitch
+                    value={active}
+                    disabled={saving}
+                    onChange={(val) => {
+                      setPendingActiveValue(val);
+                      setConfirmVisible(true);
+                    }}
+                  />),
+              },]}
+          />
+
+          <SectionListCard
+            title="Data Pribadi"
+            items={[
               ["name", "Nama Lengkap"],
               ["alias", "Nama Panggilan"],
               ["phone", "No. Handphone"],
               ["email", "Email"],
               ["address", "Alamat"],
-            ].map(([field, label]) => (
-              <>
-                <List.Item
-                  key={field}
-                  title={label}
-                  description={
-                    field === "phone"
-                      ? data[field]
-                        ? `+62${data[field]}`
-                        : "Atur Sekarang"
-                      : data[field] || "Atur Sekarang"
-                  }
-                  titleStyle={styles.itemTitle}
-                  descriptionStyle={styles.itemValue}
-                  right={() => <List.Icon icon="chevron-right" />}
-                  onPress={() => goEdit(field, label, data[field])}
-                />
-                <View style={styles.divider} />
-              </>
-            ))}
-          </>
-        )}
 
-        {/* ADMIN */}
-        {section(
-          <>
-            <Text style={styles.sectionTitle}>Atur Akses Admin</Text>
-            <List.Item
-              title="Berikan akses admin"
-              description={assignRole ? "Ya" : "Tidak"}
-              titleStyle={styles.itemTitle}
-              descriptionStyle={styles.itemValue}
-              right={() => <ToggleSwitch value={assignRole} onChange={setAssignRole} />}
-            />
+            ].map(([field, label]) => ({
+              label,
+              value:
+                field === "phone"
+                  ? data[field]
+                    ? `+62${data[field]}`
+                    : "Atur Sekarang"
+                  : data[field] || "Atur Sekarang",
+              right: () => <List.Icon icon="chevron-right" />,
+              onPress: () => goEdit(field, label, data[field]),
+            }))}
+          />
 
-            {assignRole && (
-              <>
-                <View style={styles.divider} />
-                <List.Item
-                  title="Level Akses"
-                  description={
-                    roles.find((r) => r.value === roleId[0])?.label ||
-                    "Pilih Level Akses"
-                  }
-                  titleStyle={styles.itemTitle}
-                  descriptionStyle={styles.itemValue}
-                  right={() => <List.Icon icon="chevron-right" />}
-                  onPress={async () => {
-                    await loadRoles();
-                    goEdit("role_ids", "Level Akses", roleId[0]);
-                  }}
-                />
-              </>
-            )}
-          </>
-        )}
 
-       
+
+          <SectionListCard
+            title="Pengaturan Akses"
+            items={[
+              {
+                label: "Pengaturan Akses Operasional",
+                value: "",
+                right: () => <List.Icon icon="chevron-right" />,
+                onPress: () => goEditAksesOps(),
+              },
+              {
+                label: "Pengaturan Akses Admin",
+                value: rolesAdmin,
+                right: () => <List.Icon icon="chevron-right" />,
+                onPress: () => goEditAksesAdmin(),
+              },
+            ]}
+
+          />
+
+          <SectionListCard
+            title=""
+            items={[
+              {
+                label: "Hapus Mitra",
+                value: "",
+                right: () => <List.Icon icon="delete-outline" color="red" />,
+                //right: () => <List.Icon icon="chevron-right" />,
+                //variant: "centerAction",
+                onPress: () => setConfirmDeleteVisible(true),
+                labelStyle: {
+                  color: "red",
+                  fontWeight: "500",
+                  fontSize: 15,
+                },
+
+                valueStyle: {
+                  color: "#777",
+                  fontStyle: "italic",
+                },
+              },
+            ]}
+          />
+
+        </View>
       </ScrollView>
+
+      {saving && (
+        <View style={styles.loadingOverlay}>
+          <ActivityIndicator size="large" color="#fff" />
+        </View>
+      )}
+
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F4F4F4", paddingHorizontal: 16 },
-  sectionCard: { backgroundColor: "#FFF", borderRadius: 12, marginBottom: 22, paddingHorizontal: 12, paddingTop: 14 },
-  divider: { height: 1, backgroundColor: "#E6E6E6", marginLeft: 16 },
-  sectionTitle: { fontSize: 13, fontWeight: "700", color: "#555", marginBottom: 12 },
-  itemTitle: { fontSize: 12, color: "#777" },
-  itemValue: { fontSize: 15, fontWeight: "600", color: "#333" },
+  container: {
+    flex: 1,
+    backgroundColor: "#F4F4F4",
+  },
+
+
+  scroll: {
+    flex: 1,
+  },
+
+  body: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    gap: 18,
+  },
+  loadingOverlay: {
+    position: "absolute",
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 999,
+  },
+
 });
+

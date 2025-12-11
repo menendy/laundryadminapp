@@ -149,7 +149,7 @@ export default function KaryawanListScreen() {
   });
 
   const renderItem = ({ item }: any) => (
-    <MitraItem item={item} onEdit={(i: any) => router.push(`/karyawan/edit2/${i.id}`)} />
+    <MitraItem item={item} onEdit={(i: any) => router.push(`/karyawan/edit/${i.id}`)} />
   );
 
   return (

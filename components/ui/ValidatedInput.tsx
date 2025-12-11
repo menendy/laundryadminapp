@@ -17,8 +17,10 @@ export default function ValidatedInput({
   editable = true,
   ...props
 }: ValidatedInputProps) {
+  const isMultiline = props.multiline === true;
+
   return (
-    <View style={{ marginBottom: 14 }}>
+    <View style={{ marginBottom: 18 }}>
       <Text style={styles.label}>
         {label}
         {required && <Text style={styles.required}>*</Text>}
@@ -26,15 +28,24 @@ export default function ValidatedInput({
 
       <View
         style={[
-          styles.inputWrapper,
-          error && styles.inputError,
-          !editable && styles.disabledWrapper,
+          styles.container,
+          error && styles.errorBorder,
+          !editable && styles.disabledContainer,
+
+          // FIX MULTILINE LAYOUT
+          isMultiline && {
+            alignItems: "flex-start",
+            height: "auto",
+            minHeight: 52,
+            paddingTop: 12,
+            paddingBottom: 12,
+          },
         ]}
       >
-        {prefix && (
-          <View style={styles.prefixWrapper}>
+        {prefix && !isMultiline && (
+          <View style={styles.prefixBox}>
             {typeof prefix === "string" || typeof prefix === "number" ? (
-              <Text>{prefix}</Text>
+              <Text style={styles.prefixText}>{prefix}</Text>
             ) : (
               prefix
             )}
@@ -46,6 +57,9 @@ export default function ValidatedInput({
             styles.input,
             style,
             !editable && styles.disabledText,
+
+            // FIX MULTILINE TEXT ALIGN
+            isMultiline && { textAlignVertical: "top" },
           ]}
           placeholderTextColor="#999"
           editable={editable}
@@ -53,7 +67,7 @@ export default function ValidatedInput({
         />
       </View>
 
-      {error ? <Text style={styles.errorText}>{error}</Text> : null}
+      {!!error && <Text style={styles.errorText}>{error}</Text>}
     </View>
   );
 }
@@ -61,50 +75,54 @@ export default function ValidatedInput({
 const styles = StyleSheet.create({
   label: {
     fontSize: 14,
-    fontWeight: "500",
-    color: "#333",
+    fontWeight: "600",
     marginBottom: 6,
+    color: "#333",
   },
   required: {
     color: "red",
   },
-  inputWrapper: {
+  container: {
     flexDirection: "row",
     alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 8,
+    borderRadius: 10,
+    borderWidth: 1.2,
+    borderColor: "#C9CED6",
     backgroundColor: "#fff",
+    height: 52, // default height untuk single-line
     overflow: "hidden",
   },
-  disabledWrapper: {
-    backgroundColor: "#e5e5e5",
-    borderColor: "#bbb",
-  },
-  prefixWrapper: {
+  prefixBox: {
     paddingHorizontal: 14,
-    backgroundColor: "#eee",
+    backgroundColor: "#ECEFF1",
     justifyContent: "center",
     alignItems: "center",
     borderRightWidth: 1,
-    borderRightColor: "#ccc",
+    borderRightColor: "#C9CED6",
     height: "100%",
+  },
+  prefixText: {
+    fontSize: 16,
+    color: "#555",
   },
   input: {
     flex: 1,
-    paddingVertical: 14,
-    paddingHorizontal: 14,
     fontSize: 16,
+    paddingHorizontal: 14,
   },
-  disabledText: {
-    color: "#666",
-  },
-  inputError: {
-    borderColor: "#F44336",
+  errorBorder: {
+    borderColor: "#D32F2F",
   },
   errorText: {
-    color: "#F44336",
-    fontSize: 12,
     marginTop: 4,
+    fontSize: 12,
+    color: "#D32F2F",
+  },
+  disabledContainer: {
+    backgroundColor: "#EEE",
+    borderColor: "#BBB",
+  },
+  disabledText: {
+    color: "#777",
   },
 });

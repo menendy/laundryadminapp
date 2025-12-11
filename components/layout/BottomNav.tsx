@@ -101,7 +101,7 @@ export default function BottomNav({ onMenuPress, onMenuClose, isDrawerOpen }) {
               color: pathname.startsWith("/karyawan") ? "#007bff" : "#666",
             }}
           >
-            Karyawan
+            Mitra
           </Text>
         </TouchableOpacity>
       </View>

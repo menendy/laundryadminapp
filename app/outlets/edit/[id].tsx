@@ -75,7 +75,7 @@ export default function EditOutletScreen() {
       const ok = handleBackendError(result, setErrors, showSnackbar);
       if (!ok) return;
 
-      showSnackbar("Outlet berhasil diperbarui", "success");
+      showSnackbar("berhasil diperbarui", "success");
       router.back(); // karena edit → balik ke list/detail
 
     } catch (err) {

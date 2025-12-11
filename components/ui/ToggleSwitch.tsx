@@ -4,9 +4,14 @@ import { Animated, TouchableOpacity } from "react-native";
 interface IOSSwitchProps {
   value: boolean;
   onChange: (newValue: boolean) => void;
+  disabled?: boolean; // ➕ Tambahan baru
 }
 
-export default function IOSSwitch({ value, onChange }: IOSSwitchProps) {
+export default function IOSSwitch({
+  value,
+  onChange,
+  disabled = false, // ➕ Default false
+}: IOSSwitchProps) {
   const animated = React.useRef(new Animated.Value(value ? 1 : 0)).current;
 
   React.useEffect(() => {
@@ -24,15 +29,19 @@ export default function IOSSwitch({ value, onChange }: IOSSwitchProps) {
 
   return (
     <TouchableOpacity
-      activeOpacity={0.9}
-      onPress={() => onChange(!value)}
+      activeOpacity={disabled ? 1 : 0.9} // 🔒 tidak ada efek tekan ketika disable
+      onPress={() => !disabled && onChange(!value)} // 🔒 cegah onPress
       style={{
         width: 46,
         height: 28,
         borderRadius: 20,
         justifyContent: "center",
         padding: 2,
-        backgroundColor: value ? "#34C759" : "#E5E5EA",
+        backgroundColor: disabled
+          ? "#C8C8C8" // 🎨 warna disabled
+          : value
+          ? "#34C759"
+          : "#E5E5EA",
       }}
     >
       <Animated.View
@@ -42,7 +51,7 @@ export default function IOSSwitch({ value, onChange }: IOSSwitchProps) {
           borderRadius: 12,
           backgroundColor: "#fff",
           shadowColor: "#000",
-          shadowOpacity: 0.2,
+          shadowOpacity: disabled ? 0.05 : 0.2, // 🌫 soft shadow saat disabled
           shadowRadius: 2,
           transform: [{ translateX: translate }],
         }}

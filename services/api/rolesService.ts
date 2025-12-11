@@ -52,7 +52,7 @@ export interface RoleTypesResponse {
 }
 
 
-export const getRoleTypes = async(): Promise<RoleTypesResponse> => {
+export const getRoleTypes = async (): Promise<RoleTypesResponse> => {
   try {
     const res = await api.get("/getRolesType");
     return res.data; // expect array of {id, label}
@@ -65,12 +65,31 @@ export const getRoleTypes = async(): Promise<RoleTypesResponse> => {
 /* ------------------------------------------
    ROLE LIST LITE (dropdown)
 -------------------------------------------*/
-export const getRoleListLite = async () => {
+export const getRoleListLite = async (
+  rootPath: string,      // wajib agar sesuai dengan hook
+  basePath: string,      // wajib juga
+  search: string | null = null,
+  cursor: string | null = null,
+  limit = 20
+) => {
   try {
-    const res = await api.get("/getRoleListLite");
-    return res.data; // { success, data }
+    const params = new URLSearchParams();
+
+    params.append("rootPath", rootPath);
+    params.append("basePath", basePath);
+
+    if (search) params.append("search", search);
+    params.append("limit", limit.toString());
+
+    const res = await api.get(`/getRoleListLite?${params.toString()}`);
+
+    return {
+      success: res.data.success,
+      data: res.data.data,     // <─ hook butuh "data"
+    };
   } catch (err) {
     console.error("❌ getRoleListLite error:", err);
     return { success: false, data: [] };
   }
 };
+

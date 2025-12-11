@@ -99,3 +99,18 @@ export const updateMitraV2 = async (
   const res = await api.put(`/updateMitrav2?id=${id}`, payload);
   return res.data;
 };
+
+
+export const deleteMitraV2 = async (
+  mitraId: string,
+  payload: MitraPayload
+) => {
+  const body = {
+    mitraId,
+    ...payload
+  };
+
+  const res = await api.post("/deleteMitra", body);
+  return res.data;
+};
+
