@@ -19,6 +19,7 @@ import { useSegments } from "expo-router";
 
 
 
+
 const theme = {
   ...DefaultTheme,
   roundness: 10,
@@ -120,27 +121,27 @@ export default function Layout() {
 
           {/* HYDRATION WRAPPER */}
           <AppInitializer>
-           {/* Handler Tap-to-dismiss for info-blocking */}
-{snackbar.visible && snackbar.type === "info-blocking" && (
-  <Pressable
-    style={{
-      position: "absolute",
-      top: 0,
-      bottom: 0,
-      left: 0,
-      right: 0,
-      zIndex: 999998, // Di bawah snackbar, di atas UI lain
-    }}
-    onPress={snackbar.hideSnackbar}
-  />
-)}
+            {/* Handler Tap-to-dismiss for info-blocking */}
+            {snackbar.visible && snackbar.type === "info-blocking" && (
+              <Pressable
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  zIndex: 999998, // Di bawah snackbar, di atas UI lain
+                }}
+                onPress={snackbar.hideSnackbar}
+              />
+            )}
 
-<AlertSnackbar
-  visible={snackbar.visible}
-  message={snackbar.message}
-  onDismiss={snackbar.hideSnackbar}
-  type={snackbar.type}
-/>
+            <AlertSnackbar
+              visible={snackbar.visible}
+              message={snackbar.message}
+              onDismiss={snackbar.hideSnackbar}
+              type={snackbar.type}
+            />
 
 
             <View style={{ flex: 1, backgroundColor: "#f6f7f8" }}>

@@ -12,7 +12,28 @@
           "package_name": "com.anonymous.laundryadminapp"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "185674802778-ar39k4mittjfn4metobnsqj37lat7uc9.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.anonymous.laundryadminapp",
+            "certificate_hash": "5e8f16062ea3cd2c4a0d547876baa6f38cabf625"
+          }
+        },
+        {
+          "client_id": "185674802778-j60m2v0pg8ug4klv9tbbni8ph8den4mh.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.anonymous.laundryadminapp",
+            "certificate_hash": "1646c7aa1aa52a161ed5b8e701b4aabfe6c746b3"
+          }
+        },
+        {
+          "client_id": "185674802778-tdh8upncae3d4qjn6ngmcfkta409lu8i.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyDKTQrHJ-uh91-CRzUki4k4qTYAUDOW9J4"
@@ -20,7 +41,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "185674802778-gd66ajgk7gv0bnamsddfpsfv6s31o77g.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "185674802778-m2s4ds61i006oobs5uh8uh2i55e8hbps.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.laundryApps"
+              }
+            }
+          ]
         }
       }
     },
@@ -31,7 +64,12 @@
           "package_name": "com.example.laundry_apps"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "185674802778-tdh8upncae3d4qjn6ngmcfkta409lu8i.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyDKTQrHJ-uh91-CRzUki4k4qTYAUDOW9J4"
@@ -39,7 +77,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "185674802778-gd66ajgk7gv0bnamsddfpsfv6s31o77g.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "185674802778-m2s4ds61i006oobs5uh8uh2i55e8hbps.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.laundryApps"
+              }
+            }
+          ]
         }
       }
     }

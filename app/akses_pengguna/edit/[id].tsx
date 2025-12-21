@@ -1,246 +1,331 @@
 import React, { useEffect, useState } from "react";
-import { View, ScrollView, Text, Pressable } from "react-native";
-import { Button, Chip } from "react-native-paper";
-import { useRouter, useLocalSearchParams,usePathname  } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
+import { View, ScrollView, StyleSheet } from "react-native";
+import { List, ActivityIndicator } from "react-native-paper";
+import { useRouter, useGlobalSearchParams } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import AppHeaderActions from "../../../components/ui/AppHeaderActions";
-import ValidatedInput from "../../../components/ui/ValidatedInput";
-import {
-  getAksesPenggunaById,
-  updateAksesPengguna,
-  PermissionItem,
-} from "../../../services/api/aksesPenggunaService";
-import { useSnackbarStore } from "../../../store/useSnackbarStore";
-import { handleBackendError } from "../../../utils/handleBackendError";
-import { useRolePermissionStore } from "../../../store/useRolePermissionStore";
-import { useBasePath } from "../../../utils/useBasePath";
+import SectionListCard from "../../../components/ui/SectionListCard";
 import ToggleSwitch from "../../../components/ui/ToggleSwitch";
+
+import { getAksesPenggunaById, deleteAksesPengguna } from "../../../services/api/aksesPenggunaService";
+import { useSnackbarStore } from "../../../store/useSnackbarStore";
+import { useBasePath } from "../../../utils/useBasePath";
+import ConfirmBottomSheet from "../../../modals/ConfirmBottomSheet";
+import { updateAksesPengguna } from "../../../services/api/aksesPenggunaService";
+import { handleBackendError } from "../../../utils/handleBackendError";
+
 
 
 
 export default function EditAksesPenggunaScreen() {
-  const { id } = useLocalSearchParams();       // id role dari URL
   const router = useRouter();
- 
+  const params = useGlobalSearchParams<any>();
+  const { id } = params;
 
+  const insets = useSafeAreaInsets();
   const showSnackbar = useSnackbarStore((s) => s.showSnackbar);
-  
-
   const { rootBase: rootPath, basePath } = useBasePath();
+
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   const [name, setName] = useState("");
   const [desc, setDesc] = useState("");
   const [active, setActive] = useState(true);
   const [appAccess, setAppAccess] = useState<string[]>([]);
+  const [pendingActiveValue, setPendingActiveValue] = useState(active);
+  const [confirmVisible, setConfirmVisible] = useState(false);
+  const [confirmDeleteVisible, setConfirmDeleteVisible] = useState(false);
   const [errors, setErrors] = useState<any>({});
-  const [loading, setLoading] = useState(false);
-  const [initialLoading, setInitialLoading] = useState(true);
 
-  const permissions = useRolePermissionStore((s) => s.permissions);
-  const setPermissions = useRolePermissionStore((s) => s.setPermissions);
-  const resetPermissions = useRolePermissionStore((s) => s.resetPermissions);
-
-// PRELOAD DATA ROLE
-useEffect(() => {
-  (async () => {
-    if (!id) return;
-
+  const loadData = async () => {
     try {
-      setInitialLoading(true);
 
-      //console.log("pathname:", pathname);
-      const data = await getAksesPenggunaById(String(id),rootPath,basePath);
-      if (!data) return;
+
+      const data = await getAksesPenggunaById(String(id), rootPath, basePath);
 
       setName(data.name ?? "");
       setDesc(data.description ?? "");
       setAppAccess(data.app_access ?? []);
       setActive(data.active);
-
-      const permsArray: PermissionItem[] = data.permissions ?? [];
-      const mapped: Record<string, string[]> = {};
-
-      permsArray.forEach((p) => {
-        if (!p || !p.page_id) return;
-        mapped[p.page_id] = Array.isArray(p.actions) ? p.actions : [];
-      });
-
-      console.log("🔥 Set permissions to store:", mapped);
-
-      resetPermissions();
-      setPermissions(mapped);
-
     } catch (err) {
-      console.error("🔥 load role error:", err);
-      showSnackbar("Gagal memuat data role", "error");
+      showSnackbar("Gagal memuat data akses pengguna", "error");
     } finally {
       setInitialLoading(false);
     }
-  })();
-}, [id]);
-
-  const toggleAccess = (val: string) => {
-    setAppAccess((curr) =>
-      curr.includes(val) ? curr.filter((x) => x !== val) : [...curr, val]
-    );
   };
 
-  const validate = () => {
-    const e: any = {};
-    if (!name.trim()) e.name = "Nama akses wajib diisi";
-    if (!desc.trim()) e.desc = "Deskripsi wajib diisi";
-    if (appAccess.length === 0) e.access = "Pilih minimal 1 access";
-    setErrors(e);
-    return Object.keys(e).length === 0;
-  };
+  useEffect(() => {
+    if (id) loadData();
+  }, [id]);
 
-  const handleSubmit = async () => {
-    if (!validate()) {
-      showSnackbar("Lengkapi data dengan benar", "error");
-      return;
+  // ======================================================
+  // 🔥 REALTIME UPDATE DARI MODAL (router.setParams)
+  // ======================================================
+  useEffect(() => {
+    
+
+    if (params.updatedField && params.updatedValue !== undefined) {
+      //console.log("Realtime update ⬅️", params.updatedField, params.updatedValue);
+
+      if (params.updatedField === "name") setName(String(params.updatedValue));
+      if (params.updatedField === "desc") setDesc(String(params.updatedValue));
+      if (params.updatedField === "active") setActive(Boolean(params.updatedValue));
+
+      // reset untuk hindari efek looping
+      router.setParams({
+        updatedField: undefined,
+        updatedValue: undefined,
+      });
     }
+  }, [params.updatedField, params.updatedValue]);
 
+
+  useEffect(() => {
+  }, [name, desc, active]);
+
+  const handleUpdate = async (value: boolean) => {
     try {
-      setLoading(true);
-
-      // ubah permissions (object) → array {page_id, actions}
-      const formattedPermissions: PermissionItem[] = Object.entries(permissions).map(
-        ([page_id, actions]) => ({
-          page_id,
-          actions: actions ?? [],
-        })
-      );
-
-      const payload = {
-        name: name.trim(),
-        description: desc.trim(),
-        appAccess,
-        active,
-        permissions: formattedPermissions,
-        rootPath, basePath,
-      };
-
-      const result = await updateAksesPengguna(String(id), payload);
-
-      const ok = handleBackendError(result, setErrors, showSnackbar);
-      if (!ok) return;
-
-      showSnackbar("Berhasil diperbarui", "success");
-      router.back();
+      //setSaving(true);
+      const payload = { active: value, rootPath, basePath };
+      const res = await updateAksesPengguna(String(id), payload);
+      const ok = handleBackendError(res, setErrors, showSnackbar);
+      if (!ok) return false;
+      showSnackbar("Status diperbarui", "success");
+      return true;
     } catch (err) {
-      console.error("🔥 Error update:", err);
       handleBackendError(err, setErrors, showSnackbar);
+      return false;
     } finally {
-      setLoading(false);
+      //setSaving(false);
     }
   };
+
+  const handleDelete = async () => {
+    try {
+      setSaving(true);
+      const res = await deleteAksesPengguna(String(id), { rootPath, basePath });
+      const ok = handleBackendError(res, setErrors, showSnackbar);
+      if (!ok) return false;
+      showSnackbar("Berhasil dihapus", "success");
+      return true;
+    } finally {
+      setSaving(false);
+    }
+  };
+
+
+  // ======================================================
 
   if (initialLoading) {
+
     return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-        <Text>Memuat data role...</Text>
+      <View style={{ flex: 1, justifyContent: "center" }}>
+        <ActivityIndicator size="large" />
       </View>
     );
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: "#f9f9f9" }}>
-      <AppHeaderActions title="Edit Role" showBack />
+    <View style={{ flex: 1, backgroundColor: "#F4F4F4" }}>
+      <AppHeaderActions showBack title="Data Akses Pengguna" />
 
-      <ScrollView contentContainerStyle={{ padding: 20 }}>
-        <ValidatedInput
-          label="Nama Akses"
-          required
-          placeholder="Supervisor, Kasir, Admin..."
-          value={name}
-          onChangeText={setName}
-          error={errors.name}
-        />
 
-        <ValidatedInput
-          label="Deskripsi"
-          required
-          placeholder="Deskripsi Akses"
-          value={desc}
-          onChangeText={setDesc}
-          error={errors.desc}
-        />
 
-     {/* STATUS */}
-            <View style={{ marginTop: 20 }}>
-              <Text style={{ fontWeight: "700", marginBottom: 10 }}>
-                Status Halaman
-              </Text>
-    
-              <View style={{ flexDirection: "row", alignItems: "center" }}>
-                <ToggleSwitch value={active} onChange={setActive} />
-                <Text style={{ marginLeft: 10, fontSize: 15, fontWeight: "600" }}>
-                  {active ? "Aktif" : "Nonaktif"}
-                </Text>
-              </View>
-            </View>
-    
+      <ScrollView
+        contentContainerStyle={{
+          paddingBottom: insets.bottom + 100,
+          paddingHorizontal: 16,
+        }}
+      >
 
-        <Text style={{ marginTop: 20, marginBottom: 10, fontWeight: "600" }}>
-          App Access
-        </Text>
 
-        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
-          <Chip
-            selected={appAccess.includes("admin")}
-            onPress={() => toggleAccess("admin")}
-          >
-            Admin Dashboard
-          </Chip>
-
-          <Chip
-            selected={appAccess.includes("operational")}
-            onPress={() => toggleAccess("operational")}
-          >
-            Operasional App
-          </Chip>
-        </View>
-        {errors.access && (
-          <Text style={{ color: "red", marginTop: 6 }}>{errors.access}</Text>
-        )}
-
-        <Pressable
-          onPress={() =>
-            router.push({
-              pathname: "/akses_pengguna/akses_admin",
-              params: { roleId: id }, // 🔥 kirim id ke akses_admin
-            })
+        <ConfirmBottomSheet
+          visible={confirmVisible}
+          title={pendingActiveValue ? "Aktifkan Akun?" : "Nonaktifkan Akun?"}
+          message={
+            pendingActiveValue
+              ? "Apakah Anda yakin ingin mengaktifkan Akses Pengguna ini?"
+              : "Apakah Anda yakin ingin menonaktifkan Akses Pengguna ini?"
           }
-          style={{
-            marginTop: 30,
-            paddingVertical: 10,
-            flexDirection: "row",
-            justifyContent: "space-between",
-            alignItems: "center",
-            backgroundColor: "#fff",
-            borderRadius: 8,
-            paddingHorizontal: 14,
-            borderColor: "#ddd",
-            borderWidth: 1,
+          confirmText="Ya, Lanjutkan"
+          cancelText="Batal"
+          onConfirm={async () => {
+            setConfirmVisible(false);
+            const prev = active;
+            setActive(pendingActiveValue);
+            const ok = await handleUpdate(pendingActiveValue);
+            if (!ok) setActive(prev);
           }}
-        >
-          <Text style={{ fontWeight: "700", fontSize: 16 }}>
-            Atur Halaman Admin
-          </Text>
-          <Ionicons name="chevron-forward" size={22} color="#333" />
-        </Pressable>
+          onCancel={() => {
+            setConfirmVisible(false);
+            setActive(active); // pastikan revert UI
+          }}
+        />
 
-        <Button
-          mode="contained"
-          onPress={handleSubmit}
-          loading={loading}
-          disabled={loading}
-          style={{ marginTop: 20 }}
-        >
-          {loading ? "Menyimpan..." : "Simpan Perubahan"}
-        </Button>
+        <ConfirmBottomSheet
+          visible={confirmDeleteVisible}
+          title="Hapus Akses Pengguna?"
+          message="Apakah Anda yakin ingin menghapus Pengguna ini?"
+          confirmText="Ya, Hapus"
+          cancelText="Batal"
+          onConfirm={async () => {
+            setConfirmDeleteVisible(false);
+
+            const prev = active; // simpan state lama untuk rollback jika perlu
+            try {
+              //setSaving(true);
+
+              // panggil API delete
+              const ok = await handleDelete();
+              if (!ok) {
+                setActive(prev); // rollback UI kalau gagal
+                return;
+              }
+
+              showSnackbar("Berhasil dihapus", "success");
+
+              // kembali ke halaman daftar
+              router.replace("/akses_pengguna");
+            } catch (err) {
+              handleBackendError(err, setErrors, showSnackbar);
+              setActive(prev);
+            } finally {
+              //setSaving(false);
+            }
+          }}
+
+          onCancel={() => {
+            setConfirmDeleteVisible(false);
+          }}
+        />
+
+        {/* STATUS */}
+        <SectionListCard
+          title=""
+          style={{ marginTop: 16 }}
+          items={[
+            {
+              label: "Status Halaman",
+              value: active ? "Aktif" : "Nonaktif",
+              right: () => (
+                <ToggleSwitch
+                  value={active}
+                  //disabled={saving}
+                  onChange={(val) => {
+                    setPendingActiveValue(val);
+                    setConfirmVisible(true);
+                  }}
+                />),
+            },
+          ]}
+        />
+
+        {/* NAME + DESC */}
+        <SectionListCard
+          title=""
+          items={[
+            {
+              label: "Nama Akses",
+              value: name || "Atur Sekarang",
+              right: () => <List.Icon icon="chevron-right" />,
+              onPress: () =>
+                router.push({
+                  pathname: "/akses_pengguna/edit/modal/[field]",
+                  params: {
+                    id,
+                    field: "name",
+                    label: "Nama Akses",
+                    value: name,
+                    rootPath,
+                    basePath,
+                  },
+                }),
+            },
+            {
+              label: "Deskripsi",
+              value: desc || "Atur Sekarang",
+              right: () => <List.Icon icon="chevron-right" />,
+              onPress: () =>
+                router.push({
+                  pathname: "/akses_pengguna/edit/modal/[field]",
+                  params: {
+                    id,
+                    field: "desc",
+                    label: "Deskripsi",
+                    value: desc,
+                    rootPath,
+                    basePath,
+                  },
+                }),
+            },
+          ]}
+        />
+
+        {/* PERMISSIONS */}
+        <SectionListCard
+          title="Pengaturan Akses Aplikasi"
+          items={[
+            {
+              label: "Atur Akses Produksi",
+              value: "",
+              right: () => <List.Icon icon="chevron-right" />,
+              onPress: () =>
+                router.push({
+                  pathname: "",
+                  params: { roleId: id, rootPath, basePath },
+                }),
+            },
+            {
+              label: "Atur Akses Admin",
+              value: "",
+              right: () => <List.Icon icon="chevron-right" />,
+              onPress: () =>
+                router.push({
+                  pathname: "/akses_pengguna/edit/modal/akses_admin",
+                  params: { roleId: id, rootPath, basePath },
+                }),
+            },
+          ]}
+        />
+
+        {/* DELETE */}
+        <SectionListCard
+          title=""
+          items={[
+            {
+              label: "Hapus Data Akses Pengguna",
+              value: "",
+              right: () => <List.Icon icon="delete-outline" color="red" />,
+              onPress: () => setConfirmDeleteVisible(true),
+              labelStyle: { color: "red", fontWeight: "500", fontSize: 15 },
+            },
+          ]}
+        />
       </ScrollView>
+
+      {saving && (
+        <View style={styles.loadingOverlay}>
+          <ActivityIndicator size="large" color="#fff" />
+        </View>
+      )}
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: "#F4F4F4" },
+  scroll: { flex: 1 },
+  loadingOverlay: {
+    position: "absolute",
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 999,
+  },
+});

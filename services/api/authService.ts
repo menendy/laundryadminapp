@@ -27,3 +27,30 @@ export const loginUser = async (payload: { uid: string }) => {
   const res = await api.post("/loginUser", payload);
   return res.data;
 };
+
+
+export interface ForgotPasswordPayload {
+  email: string;
+}
+
+export interface ForgotPasswordResponse {
+  success?: boolean;
+  message?: string;
+  field?: string;
+}
+
+export const forgotPassword = async (
+  payload: ForgotPasswordPayload
+): Promise<ForgotPasswordResponse> => {
+  const res = await api.post("/forgotPassword", payload);
+  return res.data;
+};
+
+// ============================
+// CHECK FORGOT PASSWORD
+// ============================
+export const checkForgotPassword = async (payload: { email: string }) => {
+  const res = await api.post("/checkForgotPassword", payload);
+  return res.data;
+};
+

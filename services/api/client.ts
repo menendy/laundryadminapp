@@ -1,13 +1,15 @@
 import axios, {
-  AxiosRequestConfig,
   InternalAxiosRequestConfig,
   AxiosError,
 } from "axios";
 import { API_BASE_URL } from "../../constants/env";
+import { useAuthStore } from "../../store/useAuthStore";
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
-  headers: { "Content-Type": "application/json" },
+  headers: {
+    "Content-Type": "application/json",
+  },
   timeout: 15000,
 });
 
@@ -15,19 +17,11 @@ export const api = axios.create({
 // REQUEST INTERCEPTOR — AUTO TOKEN INJECTION
 // ==========================================
 api.interceptors.request.use(
-  async (config: InternalAxiosRequestConfig) => {
-    try {
-      // Dynamic import universal firebase (web + mobile)
-      const { auth, getIdToken } = await import("../firebase");
+  (config: InternalAxiosRequestConfig) => {
+    const token = useAuthStore.getState().token;
 
-      const user = auth.currentUser;
-
-      if (user && config.headers) {
-        const token = await getIdToken(user, false);
-        config.headers.Authorization = `Bearer ${token}`;
-      }
-    } catch (err) {
-      console.warn("⚠️ Error attaching token:", err);
+    if (token && config.headers) {
+      config.headers.Authorization = `Bearer ${token}`;
     }
 
     return config;

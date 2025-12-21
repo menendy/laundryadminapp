@@ -18,14 +18,15 @@ export default {
   slug: "laundryadminapp",
   version: "1.0.0",
   
-  plugins: [
-  
+plugins: [
+    "expo-web-browser",
+
     [
       "@react-native-firebase/app",
       {
         android_google_services_file: "./google-services.json",
-      }
-    ]
+      },
+    ],
   ],
 
   android: {

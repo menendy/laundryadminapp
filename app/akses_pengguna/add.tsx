@@ -10,6 +10,7 @@ import { addAksesPengguna } from "../../services/api/aksesPenggunaService";
 import { useSnackbarStore } from "../../store/useSnackbarStore";
 import { handleBackendError } from "../../utils/handleBackendError";
 import { useRolePermissionStore } from "../../store/useRolePermissionStore";
+import { useBasePath } from "../../utils/useBasePath";
 
 
 
@@ -20,13 +21,15 @@ export default function AddAksesPenggunaScreen() {
     useEffect(() => {
     resetPermissions(); // 🔥 Mulai fresh di mode ADD
   }, []);
+   const router = useRouter();
+  
+    const { rootBase: rootPath, basePath } = useBasePath();
+  
 
-  const router = useRouter();
-  const pathname = usePathname();
  
   const showSnackbar = useSnackbarStore((s) => s.showSnackbar);
 
-
+  
   const [name, setName] = useState("");
   const [desc, setDesc] = useState("");
 
@@ -79,7 +82,8 @@ export default function AddAksesPenggunaScreen() {
         description: desc.trim(),
         appAccess : appAccess,
         permissions: formattedPermissions,
-        pathname
+        rootPath,
+        basePath
       };
 
       const result = await addAksesPengguna(payload);
@@ -119,7 +123,9 @@ export default function AddAksesPenggunaScreen() {
       <ScrollView contentContainerStyle={{ padding: 20 }}>
 
 
-        <ValidatedInput label="Nama Akses" required placeholder="Supervisor, Kasir, Admin..." value={name} onChangeText={setName} error={errors.name} />
+        <ValidatedInput label="Nama Akses" 
+         required placeholder="Supervisor, Kasir, Admin..." 
+        value={name} onChangeText={setName} error={errors.name} />
 
         <ValidatedInput label="Deskripsi" required placeholder="Deskripsi Akses" value={desc} onChangeText={setDesc} error={errors.desc} />
 
@@ -139,21 +145,28 @@ export default function AddAksesPenggunaScreen() {
         </View>
         {errors.access && (<Text style={{ color: "red", marginTop: 6 }}>{errors.access}</Text>)}
 
-        <Pressable
-          onPress={() => router.push("/akses_pengguna/akses_admin")}
-          style={{
-            marginTop: 30,
-            paddingVertical: 10,
-            flexDirection: "row",
-            justifyContent: "space-between",
-            alignItems: "center",
-            backgroundColor: "#fff",
-            borderRadius: 8,
-            paddingHorizontal: 14,
-            borderColor: "#ddd",
-            borderWidth: 1,
-          }}
-        >
+       <Pressable
+                onPress={() =>
+                  router.push({
+                    pathname: "akses_pengguna/edit/akses_admin",
+                    params: { rootPath, basePath }, // 🔥 kirim id ke akses_admin
+                  })
+                }
+                style={{
+                  marginTop: 30,
+                  paddingVertical: 10,
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  backgroundColor: "#fff",
+                  borderRadius: 8,
+                  paddingHorizontal: 14,
+                  borderColor: "#ddd",
+                  borderWidth: 1,
+                }}
+              >
+
+
           <Text style={{ fontWeight: "700", fontSize: 16 }}>
             Atur Halaman Admin
           </Text>

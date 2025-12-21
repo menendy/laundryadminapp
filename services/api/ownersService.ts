@@ -1,10 +1,7 @@
 import { api } from "./client";
 
 export interface OwnerPayload {
-  name: string;
-  phone: string;
-  email: string;
-  address: string;
+  
 }
 
 export interface OwnerResponse {
@@ -18,27 +15,45 @@ export interface OwnerListResponse {
   success: boolean;
   data: any[];
   nextCursor?: string | null;
-  total?: number;
   limit?: number;
+  total?: number;
+  message?: string;
+  status?: number;
 }
 
 export const getOwnerList = async (
-  search: string | null = null,
-  cursor: string | null = null,
-  limit = 10
-): Promise<OwnerListResponse> => {
-  try {
-    const params = new URLSearchParams();
-    if (search) params.append("search", search);
-    if (cursor) params.append("cursor", cursor);
-    params.append("limit", limit.toString());
-
-    const res = await api.get(`/getOwnerList?${params.toString()}`);
-    return res.data;
-  } catch (err) {
-    console.error("❌ getOwnerList error:", err);
-    return { success: false, data: [] };
-  }
+   rootPath: string,                   
+    basePath: string,                    
+    search: string | null = null,
+    cursor: string | null = null,
+    limit = 10,
+    mode: "nama" | "telp" | "email" = "nama"
+  ): Promise<OwnerListResponse> => {
+    try {
+      const params = new URLSearchParams();
+  
+      params.append("rootPath", rootPath);
+      params.append("basePath", basePath);
+  
+      if (search) params.append("search", search);
+      if (cursor) params.append("cursor", cursor);
+      params.append("limit", limit.toString());
+      params.append("mode", mode);
+  
+      const res = await api.get(`/getOwnerList?${params.toString()}`);
+  
+      return res.data;
+  
+    } catch (err: any) {
+      console.error("❌ getOwnerList error:", err);
+  
+      return {
+        success: false,
+        data: [],
+        message: err?.response?.data?.message || "Gagal memuat data",
+        status: err?.response?.status || 500
+      };
+    }
 };
 
 export const addOwner = async (payload: OwnerPayload): Promise<OwnerResponse> => {
@@ -60,4 +75,17 @@ export const getOwnerListLite = async (): Promise<OwnerLiteResponse> => {
     console.error("❌ getOwnerListLite error:", err);
     return { success: false, data: [] };
   }
+};
+
+export const getOwnerById = async (id: string,rootPath: string, basePath: string) => {
+ const res = await api.get("/getOwnerDetail", { params: {id,rootPath,basePath} });
+ return res.data?.data ?? null;
+};
+
+export const updateOwner = async (
+  id: string,
+  payload: OwnerPayload
+) => {
+  const res = await api.put(`/updateOwner?id=${id}`, payload);
+  return res.data;
 };

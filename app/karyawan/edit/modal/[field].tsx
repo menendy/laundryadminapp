@@ -3,149 +3,73 @@ import {
     View,
     ScrollView,
     TouchableWithoutFeedback,
-    StyleSheet, Keyboard
+    StyleSheet,
 } from "react-native";
 import Modal from "react-native-modal";
 import { Button, IconButton, Text } from "react-native-paper";
-import { useRouter, useLocalSearchParams, usePathname } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
-import Animated, {
-    useSharedValue,
-    useAnimatedStyle,
-    withTiming,
-} from "react-native-reanimated";
+import Animated, { useSharedValue, withTiming } from "react-native-reanimated";
+
 import ValidatedInput from "../../../../components/ui/ValidatedInput";
 import { useSnackbarStore } from "../../../../store/useSnackbarStore";
 import { updateMitraV2 } from "../../../../services/api/mitraService";
 import { handleBackendError } from "../../../../utils/handleBackendError";
 
-
-
 export default function EditFieldBottomSheet() {
     const router = useRouter();
-    const pathname = usePathname();
+    const params = useLocalSearchParams<any>();
+    const { id, field, label, value, rootPath, basePath } = params;
+
     const insets = useSafeAreaInsets();
     const showSnackbar = useSnackbarStore((s) => s.showSnackbar);
+
+    const [inputValue, setInputValue] = useState(value || "");
+    const [errors, setErrors] = useState<any>({});
     const [saving, setSaving] = useState(false);
 
-
-    const params = useLocalSearchParams<any>();
-    const id = params.id;
-    const field = params.field;
-    const label = params.label;
-    const initialValue = params.value || "";
-
-    const rootPath = params.rootPath;
-    const basePath = params.basePath;
-
-    // console.log("▶ PARAMS:", { id, field, label, initialValue, rootPath, basePath });
-
-
-
-    const [inputValue, setInputValue] = useState(initialValue);
-
-    const [errors, setErrors] = useState<any>({});
-    const [visible, setVisible] = useState(true);
-    const [autoFocusInput, setAutoFocusInput] = useState(false);
+    const setFieldErrors = (errorMap: any) => {
+        setErrors((prev: any) => ({ ...prev, ...errorMap }));
+    };
 
     const overlayOpacity = useSharedValue(0);
-
-    const [keyboardHeight, setKeyboardHeight] = useState(0);
 
     useEffect(() => {
         overlayOpacity.value = withTiming(1, { duration: 200 });
     }, []);
-
-    // Delay autoFocus agar keyboard muncul setelah modal naik
-    useEffect(() => {
-        const timeout = setTimeout(() => {
-            setAutoFocusInput(true); // baru aktifkan autoFocus setelah 120ms
-        }, 120);
-
-        return () => clearTimeout(timeout);
-    }, []);
-
-
-
-
-    const overlayStyle = useAnimatedStyle(() => ({
-        opacity: overlayOpacity.value,
-    }));
-
-
 
     const close = () => {
         overlayOpacity.value = withTiming(0, { duration: 150 });
         setTimeout(() => router.back(), 150);
     };
 
-    useEffect(() => {
-        const showSub = Keyboard.addListener("keyboardDidShow", (e) =>
-            setKeyboardHeight(e.endCoordinates.height)
-        );
-        const hideSub = Keyboard.addListener("keyboardDidHide", () =>
-            setKeyboardHeight(0)
-        );
-        return () => {
-            showSub.remove();
-            hideSub.remove();
-        };
-    }, []);
-
-
-
-    const validate = () => {
-        const e: any = {};
-        if (!inputValue.trim()) {
-            e[field] = `${label} tidak boleh kosong`;
-        }
-
-        // ⬇⬇ FIX: merge, jangan reset semua errors
-        setErrors((prev: any) => ({ ...prev, ...e }));
-
-        return Object.keys(e).length === 0;
-    };
-
-    const setFieldErrors = (errorMap: any) => {
-        setErrors((prev: any) => ({ ...prev, ...errorMap }));
-    };
-
-
     const handleSave = async () => {
-        if (!validate()) {
-            showSnackbar("Lengkapi data dengan benar", "error");
+        if (!inputValue.trim()) {
+            setErrors({ [field]: `${label} tidak boleh kosong` });
             return;
         }
 
         try {
             setSaving(true);
 
-            const payload: any = {
+            const payload = {
                 [field]: inputValue.trim(),
                 rootPath,
                 basePath,
             };
 
-            const result = await updateMitraV2(id, payload);
+            const res = await updateMitraV2(String(id), payload);
+            const ok = handleBackendError(res, setErrors, showSnackbar);
+            if (!ok) return;
 
-            const ok = handleBackendError(result, setFieldErrors, showSnackbar);
-
-            if (!ok) {
-                // Handle single-field validation format
-                if (result?.field && result?.message) {
-                    setFieldErrors({ [result.field]: result.message });
-                }
-                return;
-            }
-
-            showSnackbar("Perubahan berhasil disimpan", "success");
-
-            router.replace({
-                pathname: `/karyawan/edit/${id}`,
-                params: { rootPath, basePath },
+            // kirim realtime ke parent
+            router.setParams({
+                updatedField: field,
+                updatedValue: inputValue.trim(),
             });
-            close();
 
+            showSnackbar("Perubahan disimpan", "success");
+            close();
         } catch (err: any) {
 
             const ok = handleBackendError(err, setFieldErrors, showSnackbar);
@@ -163,109 +87,101 @@ export default function EditFieldBottomSheet() {
         } finally {
             setSaving(false);
         }
-
     };
 
     return (
         <Modal
-            isVisible={visible}
-            swipeDirection={saving ? undefined : "down"}
+            isVisible
+            swipeDirection="down"
             onBackdropPress={close}
             onSwipeComplete={close}
             backdropOpacity={0}
             style={{ justifyContent: "flex-end", margin: 0 }}
-            propagateSwipe
         >
-            <Animated.View style={[StyleSheet.absoluteFillObject, overlayStyle,]} />
+            <Animated.View
+                style={[StyleSheet.absoluteFillObject, { opacity: overlayOpacity.value }]}
+            />
 
             <TouchableWithoutFeedback onPress={close}>
-                <Animated.View style={[StyleSheet.absoluteFillObject, overlayStyle]} />
+                <View style={StyleSheet.absoluteFillObject} />
             </TouchableWithoutFeedback>
 
-
-
-            {/* BOTTOM SHEET — MOVE WITH KEYBOARD */}
-            <Animated.View
+            <SafeAreaView
+                edges={["bottom"]}
                 style={{
-                    position: "absolute",
-                    bottom: 0,
-                    left: 0,
-                    right: 0,
-                    transform: [{ translateY: -(keyboardHeight + 8) }], // ⬅ offset tambahan
+                    backgroundColor: "#fff",
+                    borderTopLeftRadius: 22,
+                    borderTopRightRadius: 22,
+                    paddingHorizontal: 18,
+                    paddingTop: 10,
+                    paddingBottom: Math.max(insets.bottom, 12),
                 }}
             >
-
-                <SafeAreaView
-                    edges={["bottom"]}
-                    style={{
-                        backgroundColor: "#fff",
-                        borderTopLeftRadius: 22,
-                        borderTopRightRadius: 22,
-                        paddingHorizontal: 18,
-                        paddingTop: 10,
-                        paddingBottom: Math.max(insets.bottom, 12),
-                        maxHeight: "90%",
-                    }}
-                >
-                    <ScrollView
-                        keyboardShouldPersistTaps="handled"
-                        showsVerticalScrollIndicator={false}
-                        contentContainerStyle={{ paddingBottom: 20 }} // beri space untuk scroll terakhir
+                <ScrollView>
+                    <View
+                        style={{
+                            flexDirection: "row",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            marginBottom: 12,
+                        }}
                     >
-                        <View
-                            style={{
-                                flexDirection: "row",
-                                justifyContent: "space-between",
-                                alignItems: "center",
-                                marginBottom: 12,
-                            }}
-                        >
-                            <Text style={{ fontSize: 17, fontWeight: "700" }}>
-                                Ubah {label}
-                            </Text>
-                            <IconButton icon="close" onPress={close} />
-                        </View>
+                        <Text style={{ fontSize: 17, fontWeight: "700" }}>
+                            Ubah {label}
+                        </Text>
+                        <IconButton icon="close" onPress={close} />
+                    </View>
 
+                    {/* =========================
+                                 SPECIAL CASE: PHONE
+                             ========================== */}
+                    {field === "phone" ? (
+                        <ValidatedInput
+                            label="Nomor Telepon"
+                            required
+                            keyboardType="phone-pad"
+                            placeholder="812xxxxxxx"
+                            value={inputValue}
+                            onChangeText={(v) => {
+                                let clean = v.replace(/[^0-9]/g, "");
+
+                                if (clean.startsWith("0")) {
+                                    clean = clean.substring(1);
+                                }
+
+                                // tetap boleh kosong (biar UX enak)
+                                setErrors({});
+                                setInputValue(clean);
+                            }}
+                            error={errors.phone}
+                            prefix={
+                                <Text style={{ fontSize: 16, color: "#555" }}>+62</Text>
+                            }
+                        />
+                    ) : (
                         <ValidatedInput
                             label={label}
                             value={inputValue}
-                            onChangeText={(text) => {
-                                if (errors[field]) setErrors((prev: any) => ({ ...prev, [field]: "" }));
-
-                                if (field === "phone") {
-                                    let clean = text.replace(/[^0-9]/g, "");
-                                    if (clean.startsWith("0")) clean = clean.substring(1);
-                                    setInputValue(clean);
-                                    return;
-                                }
-                                setInputValue(text);
+                            onChangeText={(t) => {
+                                setErrors({});
+                                setInputValue(t);
                             }}
-                            error={errors[field] ?? ""}
-
-                            placeholder={field === "phone" ? "812xxxxxxx" : `Masukkan ${label}`}
-                            autoFocus={autoFocusInput}
-                            keyboardType={field === "phone" ? "phone-pad" : "default"}
-                            prefix={
-                                field === "phone" && (
-                                    <Text style={{ fontSize: 16, color: "#555" }}>+62</Text>
-                                )
-                            }
+                            error={errors[field]}
+                            placeholder={`Masukkan ${label}`}
                         />
+                    )}
+                </ScrollView>
 
-
-                    </ScrollView>
-
-                    <Button
-                        mode="contained"
-                        style={{ marginTop: 20 }}
-                        onPress={handleSave}
-                        loading={saving}
-                        disabled={saving}
-                    >
-                        Simpan
-                    </Button>
-                </SafeAreaView>
-            </Animated.View>
+                <Button
+                    mode="contained"
+                    onPress={handleSave}
+                    loading={saving}
+                    disabled={saving}
+                    style={{ marginTop: 20 }}
+                >
+                    Simpan
+                </Button>
+            </SafeAreaView>
         </Modal>
     );
 }

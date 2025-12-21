@@ -1,171 +1,213 @@
-import React, {
-  useState,
-  useCallback,
-  useEffect,
-  useRef,
-  memo,
-} from "react";
+import React, { memo } from "react";
 import {
   View,
   FlatList,
   RefreshControl,
   Keyboard,
   Text,
+  ToastAndroid,
+  Platform,
+  Pressable,
 } from "react-native";
-import {
-  Card,
-  List,
-  Button,
-  ActivityIndicator,
-} from "react-native-paper";
+import { Card, List, ActivityIndicator } from "react-native-paper";
+import Clipboard from "@react-native-clipboard/clipboard";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 
 import { getOwnerList } from "../../services/api/ownersService";
 import AppHeaderList from "../../components/ui/AppHeaderList";
 import AppSearchBarBottomSheet from "../../components/ui/AppSearchBarBottomSheet";
+import { useUniversalPaginatedList } from "../../hooks/UniversalPaginatedList";
+import { useBasePath } from "../../utils/useBasePath";
 
-/* ITEM */
-const OwnerItem = memo(({ item, onDetail }: any) => (
-  <Card
-    style={{
-      backgroundColor: "#fff",
-      borderRadius: 10,
-      borderWidth: 1,
-      borderColor: "#eee",
-      marginHorizontal: 12,
-      marginBottom: 12,
-    }}
-  >
-    <List.Item
-      title={item.name}
-      description={`${item.address}\nTelp: ${item.phone}\nEmail: ${item.email}`}
-      right={() => (
-        <Button textColor="#1976d2" onPress={onDetail}>
-          Detail
-        </Button>
-      )}
-    />
-  </Card>
-));
-
-export default function OwnerListScreen() {
-  const router = useRouter();
-
-  const [owners, setOwners] = useState<any[]>([]);
-  const [search, setSearch] = useState("");
-  const [cursor, setCursor] = useState<string | null>(null);
-
-  const [hasMore, setHasMore] = useState(true);
-  const [loading, setLoading] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
-
-  const didInitialLoad = useRef(false);
-  const fetchLock = useRef(false);
-  const endReachedLock = useRef(true);
-  const debounceTimer = useRef<NodeJS.Timeout | null>(null);
-
-  const safeFetch = useCallback(
-    async (reset = false) => {
-      if (fetchLock.current) return;
-      fetchLock.current = true;
-      setLoading(true);
-
-      try {
-        const result = await getOwnerList(search.trim() || null, reset ? null : cursor, 10);
-
-        if (result.success) {
-          setOwners((prev) => {
-            const merged = reset ? result.data : [...prev, ...result.data];
-            const unique = Array.from(new Map(merged.map((i) => [i.id, i])).values());
-            return unique;
-          });
-
-          setCursor(result.nextCursor ?? null);
-          setHasMore(!!result.nextCursor);
-        }
-      } catch (err) {
-        console.error("🔥 Error fetch owners:", err);
-      } finally {
-        fetchLock.current = false;
-        setLoading(false);
-      }
-    },
-    [search, cursor]
-  );
-
-  useEffect(() => {
-    if (didInitialLoad.current) return;
-    didInitialLoad.current = true;
-
-    safeFetch(true).then(() => {
-      setTimeout(() => (endReachedLock.current = false), 300);
-    });
-  }, []);
-
-  useEffect(() => {
-    if (!didInitialLoad.current) return;
-    if (debounceTimer.current) clearTimeout(debounceTimer.current);
-
-    if (search.trim() === "") {
-      setCursor(null);
-      safeFetch(true);
-      return;
+// ================================
+// ITEM COMPONENT
+// ================================
+const OwnerItem = memo(({ item, onEdit }: any) => {
+  const copyId = () => {
+    Clipboard.setString(item.id);
+    if (Platform.OS === "android") {
+      ToastAndroid.show("ID berhasil disalin!", ToastAndroid.SHORT);
     }
-
-    debounceTimer.current = setTimeout(() => {
-      setCursor(null);
-      safeFetch(true);
-    }, 500);
-
-    return () => {
-      if (debounceTimer.current) clearTimeout(debounceTimer.current);
-    };
-  }, [search]);
-
-  const onRefresh = async () => {
-    setRefreshing(true);
-    endReachedLock.current = true;
-    setCursor(null);
-
-    await safeFetch(true);
-
-    setTimeout(() => {
-      endReachedLock.current = false;
-      setRefreshing(false);
-    }, 300);
   };
 
-  const renderItem = useCallback(({ item }: any) => <OwnerItem item={item} onDetail={() => router.push(`/owners/${item.id}`)} />, []);
+  return (
+    <Card
+      style={{
+        backgroundColor: "#fff",
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: "#eee",
+        marginHorizontal: 12,
+        marginBottom: 14,
+      }}
+    >
+      <List.Item
+        title={item.name}
+        titleStyle={{ marginBottom: 6, fontWeight: "bold", fontSize: 17 }}
+        description={() => (
+          <View style={{ marginTop: 4 }}>
+            {/* Email */}
+            <View style={{ flexDirection: "row", marginBottom: 2 }}>
+              <MaterialCommunityIcons name="email" size={16} color="#999" />
+              <Text
+                style={{
+                  fontSize: 12,
+                  color: "#666",
+                  marginLeft: 5,
+                }}
+              >
+                {item.email}
+              </Text>
+            </View>
+
+            {/* Phone */}
+            <View style={{ flexDirection: "row", marginBottom: 2 }}>
+              <MaterialCommunityIcons name="phone" size={16} color="#999" />
+              <Text
+                style={{
+                  fontSize: 12,
+                  color: "#666",
+                  marginLeft: 5,
+                }}
+              >
+                {item.phone}
+              </Text>
+            </View>
+
+            {/* Status Aktif */}
+            <View style={{ flexDirection: "row", marginBottom: 2 }}>
+              <MaterialCommunityIcons
+                name={item.active ? "check-circle" : "close-circle"}
+                size={16}
+                color={item.active ? "green" : "red"}
+              />
+              <Text
+                style={{
+                  fontSize: 12,
+                  color: item.active ? "green" : "red",
+                  fontWeight: "600",
+                  marginLeft: 5,
+                }}
+              >
+                {item.active ? "Aktif" : "Nonaktif"}
+              </Text>
+            </View>
+
+            {/* Copy ID */}
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <Text style={{ fontSize: 12, color: "#666", marginRight: 8 }}>
+                {item.id}
+              </Text>
+              <Pressable onPress={copyId}>
+                <MaterialCommunityIcons
+                  name="content-copy"
+                  size={18}
+                  color="#666"
+                  style={{ marginTop: -3, marginLeft: -5 }}
+                />
+              </Pressable>
+            </View>
+          </View>
+        )}
+        descriptionNumberOfLines={6}
+        right={() => (
+          <Pressable
+            onPress={() => onEdit(item)}
+            style={{ paddingHorizontal: 3 }}
+          >
+            <MaterialCommunityIcons
+              name="chevron-right"
+              size={28}
+              color="#a3a1a1ff"
+            />
+          </Pressable>
+        )}
+      />
+    </Card>
+  );
+});
+
+// ================================
+// MAIN SCREEN
+// ================================
+export default function OwnerListScreen() {
+  const router = useRouter();
+  const { rootBase: rootPath, basePath } = useBasePath();
+
+  const list = useUniversalPaginatedList<any, "nama" | "telp" | "email">({
+    rootPath,
+    basePath,
+    fetchFn: getOwnerList,
+    defaultMode: "nama",
+  });
+
+  const renderItem = ({ item }: any) => (
+    <OwnerItem
+      item={item}
+      onEdit={(i: any) => router.push(`/owners/edit/${i.id}`)}
+    />
+  );
 
   return (
     <View style={{ flex: 1, backgroundColor: "#f9f9f9" }}>
-      <AppHeaderList title="Daftar Owner" onAdd={() => router.push("/owners/add")} />
-
-      <AppSearchBarBottomSheet
-        value={search}
-        onChangeText={setSearch}
-        mode="semua"
-        onChangeMode={() => {}}
-        placeholder="Cari owner..."
-        categories={[{ label: "Nama / Email", value: "semua" }]}
-        defaultMode="semua"
+      <AppHeaderList
+        title="Daftar Owner"
+        onAdd={() => router.push("/owners/add")}
       />
 
+      <AppSearchBarBottomSheet
+        value={list.search}
+        onChangeText={list.setSearch}
+        mode={list.mode}
+        onChangeMode={(m) => list.setMode(m)}
+        categories={[
+          { label: "Nama", value: "nama" },
+          { label: "Telp", value: "telp" },
+          { label: "Email", value: "email" },
+        ]}
+      />
+
+      {list.loading && list.items.length === 0 && (
+        <View style={{ paddingTop: 40 }}>
+          <ActivityIndicator size="large" />
+        </View>
+      )}
+
       <FlatList
-        data={owners}
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingBottom: 100 }}
+        data={list.items}
         keyExtractor={(i) => i.id}
         renderItem={renderItem}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-        onEndReachedThreshold={0.4}
-        onEndReached={() => {
-          if (endReachedLock.current) return;
-          if (!loading && hasMore) safeFetch();
-        }}
-        ListEmptyComponent={
-          !loading && <Text style={{ textAlign: "center", marginTop: 20, color: "#777" }}>Belum ada owner</Text>
+        refreshControl={
+          <RefreshControl
+            refreshing={list.refreshing}
+            onRefresh={list.onRefresh}
+          />
         }
-        ListFooterComponent={loading && owners.length > 0 ? <ActivityIndicator style={{ marginVertical: 20 }} /> : null}
+        onEndReachedThreshold={0.4}
+        onEndReached={list.onEndReached}
+        ListEmptyComponent={
+          !list.loading ? (
+            <Text
+              style={{
+                textAlign: "center",
+                marginTop: 20,
+                color: "#777",
+              }}
+            >
+              Belum ada owner
+            </Text>
+          ) : null
+        }
+        ListFooterComponent={
+          list.loading && list.items.length > 0 ? (
+            <ActivityIndicator style={{ marginVertical: 20 }} />
+          ) : null
+        }
         keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
         onScrollBeginDrag={() => Keyboard.dismiss()}
       />
     </View>

@@ -2,12 +2,18 @@ import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
+export interface AuthUser {
+  uid: string;
+  email?: string;
+}
+
 interface AuthState {
-  user: any | null;
+  user: AuthUser | null;
   activeTenant: string | null;
+  token: string | null;
   isHydrated: boolean;
 
-  login: (user: any, tenant: string) => void;
+  login: (user: AuthUser, tenant: string, token: string) => void;
   logout: () => void;
   hydrate: () => void;
 }
@@ -17,21 +23,31 @@ export const useAuthStore = create<AuthState>()(
     (set) => ({
       user: null,
       activeTenant: null,
+      token: null,
       isHydrated: false,
 
-      login: (user, tenant) =>
-        set({
+      // ❌ JANGAN tulis : void
+      login: (user, tenant, token) =>
+        set((state) => ({
+          ...state,
           user,
           activeTenant: tenant,
-        }),
+          token,
+        })),
 
       logout: () =>
-        set({
+        set((state) => ({
+          ...state,
           user: null,
           activeTenant: null,
-        }),
+          token: null,
+        })),
 
-      hydrate: () => set({ isHydrated: true }),
+      hydrate: () =>
+        set((state) => ({
+          ...state,
+          isHydrated: true,
+        })),
     }),
     {
       name: "auth-storage",

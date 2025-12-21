@@ -73,7 +73,7 @@ export default function AddKaryawanScreen() {
   const loadRoles = async () => {
     try {
       setLoadingRoles(true);
-      const res = await getRoleListLite();
+      const res = await getRoleListLite(rootPath,basePath);
       if (res.success) {
         setRoles(
           res.data.map((r: any) => ({

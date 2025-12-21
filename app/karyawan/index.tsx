@@ -124,7 +124,7 @@ const MitraItem = memo(({ item, onEdit }: any) => {
             <MaterialCommunityIcons
               name="chevron-right"
               size={28}
-              color="#1976d2"
+              color="#a3a1a1ff"
             />
           </Pressable>
         )}

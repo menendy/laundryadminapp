@@ -1,11 +1,21 @@
 import React from "react";
-import { View, Text, TextInput, StyleSheet, TextInputProps } from "react-native";
+import {
+  View,
+  Text,
+  TextInput,
+  StyleSheet,
+  TextInputProps,
+  Platform,
+} from "react-native";
 
 export interface ValidatedInputProps extends TextInputProps {
   label: string;
   required?: boolean;
   error?: string;
   prefix?: React.ReactNode;
+
+  // optional slot kanan (icon mata, clear, dll)
+  right?: React.ReactNode;
 }
 
 export default function ValidatedInput({
@@ -14,6 +24,7 @@ export default function ValidatedInput({
   error,
   style,
   prefix,
+  right,
   editable = true,
   ...props
 }: ValidatedInputProps) {
@@ -31,8 +42,6 @@ export default function ValidatedInput({
           styles.container,
           error && styles.errorBorder,
           !editable && styles.disabledContainer,
-
-          // FIX MULTILINE LAYOUT
           isMultiline && {
             alignItems: "flex-start",
             height: "auto",
@@ -42,6 +51,7 @@ export default function ValidatedInput({
           },
         ]}
       >
+        {/* PREFIX */}
         {prefix && !isMultiline && (
           <View style={styles.prefixBox}>
             {typeof prefix === "string" || typeof prefix === "number" ? (
@@ -52,19 +62,32 @@ export default function ValidatedInput({
           </View>
         )}
 
+        {/* INPUT */}
         <TextInput
           style={[
             styles.input,
             style,
             !editable && styles.disabledText,
-
-            // FIX MULTILINE TEXT ALIGN
             isMultiline && { textAlignVertical: "top" },
+
+            // ✅ FIX WEB: remove focus outline (AMAN)
+            Platform.OS === "web"
+              ? ({ outlineStyle: "none", outlineWidth: 0 } as any)
+              : null,
           ]}
           placeholderTextColor="#999"
           editable={editable}
+          underlineColorAndroid="transparent"
+          disableFullscreenUI
+          spellCheck={false}
+          autoCorrect={false}
           {...props}
         />
+
+        {/* RIGHT SLOT */}
+        {right && !isMultiline && (
+          <View style={styles.rightBox}>{right}</View>
+        )}
       </View>
 
       {!!error && <Text style={styles.errorText}>{error}</Text>}
@@ -89,7 +112,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.2,
     borderColor: "#C9CED6",
     backgroundColor: "#fff",
-    height: 52, // default height untuk single-line
+    height: 52,
     overflow: "hidden",
   },
   prefixBox: {
@@ -104,6 +127,11 @@ const styles = StyleSheet.create({
   prefixText: {
     fontSize: 16,
     color: "#555",
+  },
+  rightBox: {
+    paddingHorizontal: 8,
+    justifyContent: "center",
+    alignItems: "center",
   },
   input: {
     flex: 1,

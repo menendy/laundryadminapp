@@ -22,167 +22,80 @@ import { useUniversalPaginatedList } from "../../hooks/UniversalPaginatedList";
 import { useBasePath } from "../../utils/useBasePath";
 
 /* CARD ITEM */
-const OutletItem = memo(
-  ({ item, activeMenuId, onOpenMenu, onCloseMenu, onDetail, onEdit }: any) => {
-    const copyId = () => {
-      Clipboard.setString(item.id);
-      if (Platform.OS === "android") {
-        ToastAndroid.show("ID berhasil disalin!", ToastAndroid.SHORT);
-      }
-    };
+const OutletItem = memo(({ item, onEdit }: any) => {
+  const copyId = () => {
+    Clipboard.setString(item.id);
+    if (Platform.OS === "android") {
+      ToastAndroid.show("ID berhasil disalin!", ToastAndroid.SHORT);
+    }
+  };
 
-    const isMenuVisible = activeMenuId === item.id;
+  return (
+    <Card
+      style={{
+        backgroundColor: "#fff",
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: "#eee",
+        marginHorizontal: 12,
+        marginBottom: 14,
+      }}
+    >
+      <List.Item
+        title={item.name}
+        titleStyle={{ marginBottom: 6, fontWeight: "bold", fontSize: 17 }}
+        description={
+          <View style={{ marginTop: 4 }}>
+            {/* Alamat */}
+            <View style={{ flexDirection: "row", marginBottom: 3 }}>
+              <Text style={{ fontSize: 14, fontWeight: "600" }}>Alamat :</Text>
+              <Text style={{ fontSize: 14, marginLeft: 3 }}>
+                {item.address}
+              </Text>
+            </View>
 
-    return (
-      <Card
-        onPress={onOpenMenu}
-        style={{
-          backgroundColor: "#fff",
-          borderRadius: 16,
-          borderWidth: 1,
-          borderColor: "#eee",
-          marginHorizontal: 12,
-          marginBottom: 14,
-        }}
-      >
-        <List.Item
-          title={item.name}
-          titleStyle={{ marginBottom: 6, fontWeight: "bold", fontSize: 17 }}
-          description={
-            <>
-              <View style={{ marginTop: 4 }}>
-              
-                {/* Alamat */}
-                <View style={{ flexDirection: "row", marginBottom: 3 }}>
-                  <Text style={{ fontSize: 14, fontWeight: "600" }}>
-                    Alamat :
-                  </Text>
-                  <Text style={{ fontSize: 14, marginLeft: 3 }}>
-                    {item.address}
-                  </Text>
-                </View>
+            {/* Telepon */}
+            <View style={{ flexDirection: "row", marginBottom: 3 }}>
+              <Text style={{ fontSize: 14, fontWeight: "600" }}>Telepon :</Text>
+              <Text style={{ fontSize: 14, marginLeft: 3 }}>
+                {item.phone}
+              </Text>
+            </View>
 
-                {/* Telepon */}
-                <View style={{ flexDirection: "row", marginBottom: 3 }}>
-                  <Text style={{ fontSize: 14, fontWeight: "600" }}>
-                    Telepon :
-                  </Text>
-                  <Text style={{ fontSize: 14, marginLeft: 3 }}>
-                    {item.phone}
-                  </Text>
-                </View>
-
-                {/* ID */}
-                <View style={{ flexDirection: "row", alignItems: "center" }}>
-                  <Text
-                    style={{ fontSize: 12, color: "#666", marginRight: 8 }}
-                  >
-                    {item.id}
-                  </Text>
-                  <Pressable onPress={copyId}>
-                    <MaterialCommunityIcons
-                      name="content-copy"
-                      size={18}
-                      color="#666"
-                      style={{ marginTop: -3, marginLeft: -5 }}
-                    />
-                  </Pressable>
-                </View>
-
-              </View>
-            </>
-          }
-          descriptionNumberOfLines={6}
-          right={() => (
-            <Pressable onPress={onOpenMenu} style={{ paddingHorizontal: 3 }}>
-              <MaterialCommunityIcons
-                name="dots-vertical"
-                size={24}
-                color="#555"
-              />
-            </Pressable>
-          )}
-        />
-
-        {/* Popup Action Menu */}
-        {isMenuVisible && (
-          <>
-            {/* Overlay */}
-            <Pressable
-              onPress={onCloseMenu}
-              style={{
-                position: "absolute",
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                backgroundColor: "transparent",
-              }}
+            {/* ID */}
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <Text style={{ fontSize: 12, color: "#666", marginRight: 8 }}>
+                {item.id}
+              </Text>
+              <Pressable onPress={copyId}>
+                <MaterialCommunityIcons
+                  name="content-copy"
+                  size={18}
+                  color="#666"
+                  style={{ marginTop: -3, marginLeft: -5 }}
+                />
+              </Pressable>
+            </View>
+          </View>
+        }
+        descriptionNumberOfLines={6}
+        right={() => (
+          <Pressable
+            onPress={() => onEdit(item)}
+            style={{ paddingHorizontal: 3 }}
+          >
+            <MaterialCommunityIcons
+              name="chevron-right"
+              size={28}
+              color="#a3a1a1ff"
             />
-
-            {/* Popup Box */}
-            <Animated.View
-              entering={ZoomIn}
-              exiting={ZoomOut}
-              style={{
-                position: "absolute",
-                top: 10,
-                right: 10,
-                backgroundColor: "#fff",
-                borderRadius: 14,
-                paddingVertical: 10,
-                width: 160,
-                elevation: 12,
-                shadowColor: "#000",
-                shadowOpacity: 0.18,
-                shadowRadius: 8,
-                shadowOffset: { width: 0, height: 4 },
-              }}
-            >
-              <Pressable
-                onPress={onDetail}
-                style={({ pressed }) => ({
-                  flexDirection: "row",
-                  alignItems: "center",
-                  paddingVertical: 12,
-                  paddingHorizontal: 14,
-                  backgroundColor: pressed ? "#f1f5f9" : "transparent",
-                })}
-              >
-                <MaterialCommunityIcons
-                  name="eye-outline"
-                  size={22}
-                  color="#1976d2"
-                  style={{ marginRight: 12 }}
-                />
-                <Text style={{ fontSize: 15 }}>Detail</Text>
-              </Pressable>
-
-              <Pressable
-                onPress={onEdit}
-                style={({ pressed }) => ({
-                  flexDirection: "row",
-                  alignItems: "center",
-                  paddingVertical: 12,
-                  paddingHorizontal: 14,
-                  backgroundColor: pressed ? "#f1f5f9" : "transparent",
-                })}
-              >
-                <MaterialCommunityIcons
-                  name="pencil-outline"
-                  size={22}
-                  color="#1976d2"
-                  style={{ marginRight: 12 }}
-                />
-                <Text style={{ fontSize: 15 }}>Edit</Text>
-              </Pressable>
-            </Animated.View>
-          </>
+          </Pressable>
         )}
-      </Card>
-    );
-  }
-);
+      />
+    </Card>
+  );
+});
+
 
 export default function OutletListScreen() {
   const router = useRouter();

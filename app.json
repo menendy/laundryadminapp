@@ -3,14 +3,12 @@
     "name": "laundryadminapp",
     "slug": "laundryadminapp",
     "version": "1.0.0",
-
+    
     "android": {
       "package": "com.anonymous.laundryadminapp",
       "googleServicesFile": "./google-services.json"
     },
-
     "plugins": [
-     
       [
         "@react-native-firebase/app",
         {
