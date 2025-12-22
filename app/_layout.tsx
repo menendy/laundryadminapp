@@ -1,9 +1,16 @@
 // C:\Users\WIN10\laundryadminapp\app\_layout.tsx
 import React, { useEffect } from "react";
-import { View, Platform, useWindowDimensions, Animated, Text, Pressable } from "react-native";
+import {
+  View,
+  Platform,
+  useWindowDimensions,
+  Animated,
+  Text,
+  Pressable,
+} from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { MD3LightTheme as DefaultTheme, PaperProvider } from "react-native-paper";
-import { Stack } from "expo-router";
+import { Stack, useSegments } from "expo-router";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import DrawerMenu from "../components/layout/DrawerMenu";
@@ -13,13 +20,11 @@ import OfflineBanner from "../components/ui/OfflineBanner";
 
 import { useSnackbarStore } from "../store/useSnackbarStore";
 import { useAuthStore } from "../store/useAuthStore";
+import { initAuthTokenListener } from "../services/authTokenListener";
 
-import { useSegments } from "expo-router";
-
-
-
-
-
+// =========================
+// THEME
+// =========================
 const theme = {
   ...DefaultTheme,
   roundness: 10,
@@ -33,18 +38,34 @@ const theme = {
 };
 
 /**
- * AppInitializer memastikan:
- * - hydrate() dijalankan 1x
- * - UI tidak render sebelum isHydrated = true
+ * =========================================================
+ * AppInitializer
+ * - hydrate zustand (1x)
+ * - start firebase auth token listener (1x)
+ * - BLOCK UI sampai hydrate selesai
+ * =========================================================
  */
 function AppInitializer({ children }: { children: React.ReactNode }) {
   const hydrate = useAuthStore((s) => s.hydrate);
   const isHydrated = useAuthStore((s) => s.isHydrated);
 
-  // Jalankan hydrate() sekali
+  // 1️⃣ Hydrate store (WAJIB, 1x)
   useEffect(() => {
     hydrate();
   }, []);
+
+  // 2️⃣ Firebase auth token listener (SETELAH hydrate)
+  useEffect(() => {
+    if (!isHydrated) return;
+
+    const unsubscribe = initAuthTokenListener();
+
+    return () => {
+      if (typeof unsubscribe === "function") {
+        unsubscribe();
+      }
+    };
+  }, [isHydrated]);
 
   if (!isHydrated) {
     return (
@@ -57,10 +78,14 @@ function AppInitializer({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+// =========================================================
+// ROOT LAYOUT
+// =========================================================
 export default function Layout() {
   const { width } = useWindowDimensions();
   const snackbar = useSnackbarStore();
   const isWeb = Platform.OS === "web";
+  const segments = useSegments();
 
   // Breakpoints
   const isMobile = width < 600;
@@ -74,10 +99,13 @@ export default function Layout() {
 
   const [isDrawerOpen, setDrawerOpen] = React.useState(isDocked);
   const [drawerWidth, setDrawerWidth] = React.useState(280);
-  const slideAnim = React.useRef(new Animated.Value(isDocked ? 0 : -drawerWidth)).current;
+  const slideAnim = React.useRef(
+    new Animated.Value(isDocked ? 0 : -drawerWidth)
+  ).current;
   const [openMapVersion, setOpenMapVersion] = React.useState(0);
 
-  React.useEffect(() => {
+  // Drawer responsiveness
+  useEffect(() => {
     if (isDocked) {
       setDrawerOpen(true);
       slideAnim.setValue(0);
@@ -107,9 +135,7 @@ export default function Layout() {
     }).start(() => setDrawerOpen(false));
   };
 
-  const segments = useSegments();
-
-  // Jika berada di /pages_admin/add => sembunyikan bottom nav
+  // Hide bottom nav on certain routes
   const hideBottomNav =
     segments.includes("pages_admin") && segments.includes("add");
 

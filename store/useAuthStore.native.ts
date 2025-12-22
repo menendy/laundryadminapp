@@ -11,11 +11,14 @@ interface AuthState {
   user: AuthUser | null;
   activeTenant: string | null;
   token: string | null;
-  isHydrated: boolean;
 
-  login: (user: AuthUser, tenant: string, token: string) => void;
+  isHydrated: boolean;
+  authReady: boolean;
+
+  login: (user: AuthUser, tenant: string | null, token: string) => void;
   logout: () => void;
   hydrate: () => void;
+  setAuthReady: (ready: boolean) => void;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -24,30 +27,32 @@ export const useAuthStore = create<AuthState>()(
       user: null,
       activeTenant: null,
       token: null,
-      isHydrated: false,
 
-      // ❌ JANGAN tulis : void
+      isHydrated: false,
+      authReady: false,
+
       login: (user, tenant, token) =>
-        set((state) => ({
-          ...state,
+        set({
           user,
           activeTenant: tenant,
           token,
-        })),
+          authReady: true,
+        }),
 
       logout: () =>
-        set((state) => ({
-          ...state,
+        set({
           user: null,
           activeTenant: null,
           token: null,
-        })),
+          authReady: true, // auth resolved
+        }),
 
       hydrate: () =>
-        set((state) => ({
-          ...state,
+        set({
           isHydrated: true,
-        })),
+        }),
+
+      setAuthReady: (ready) => set({ authReady: ready }),
     }),
     {
       name: "auth-storage",

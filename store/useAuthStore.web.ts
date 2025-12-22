@@ -5,11 +5,14 @@ interface AuthState {
   user: any | null;
   activeTenant: string | null;
   token: string | null;
-  isHydrated: boolean;
 
-  login: (user: any, tenant: string, token: string) => void;
+  isHydrated: boolean;
+  authReady: boolean;
+
+  login: (user: any, tenant: string | null, token: string) => void;
   logout: () => void;
   hydrate: () => void;
+  setAuthReady: (ready: boolean) => void;
 }
 
 const USER_KEY = "auth-user";
@@ -20,78 +23,68 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   activeTenant: null,
   token: null,
+
   isHydrated: false,
+  authReady: false,
 
   // =========================
-  // 🔐 LOGIN (WEB)
+  // LOGIN (DIPANGGIL LISTENER)
   // =========================
   login: (user, tenant, token) => {
-    set({ user, activeTenant: tenant, token });
+    set({
+      user,
+      activeTenant: tenant,
+      token,
+      authReady: true,
+    });
 
-    if (typeof window !== "undefined") {
-      try {
-        window.localStorage.setItem(USER_KEY, JSON.stringify(user));
-        window.localStorage.setItem(TENANT_KEY, tenant);
-        window.localStorage.setItem(TOKEN_KEY, token);
-      } catch (err) {
-        console.error("[AuthStore.web] Failed to persist auth", err);
-      }
-    }
+    try {
+      localStorage.setItem(USER_KEY, JSON.stringify(user));
+      if (tenant) localStorage.setItem(TENANT_KEY, tenant);
+      localStorage.setItem(TOKEN_KEY, token);
+    } catch {}
   },
 
   // =========================
-  // 🚪 LOGOUT
+  // LOGOUT
   // =========================
   logout: () => {
-    set({ user: null, activeTenant: null, token: null });
+    set({
+      user: null,
+      activeTenant: null,
+      token: null,
+      authReady: true, // ⬅️ auth resolved (anonymous)
+    });
 
-    if (typeof window !== "undefined") {
-      try {
-        window.localStorage.removeItem(USER_KEY);
-        window.localStorage.removeItem(TENANT_KEY);
-        window.localStorage.removeItem(TOKEN_KEY);
-      } catch (err) {
-        console.error("[AuthStore.web] Failed to clear auth", err);
-      }
-    }
+    try {
+      localStorage.removeItem(USER_KEY);
+      localStorage.removeItem(TENANT_KEY);
+      localStorage.removeItem(TOKEN_KEY);
+    } catch {}
   },
 
   // =========================
-  // ♻️ HYDRATE (WEB)
+  // HYDRATE (STORAGE ONLY)
+  // ❌ JANGAN SET authReady
   // =========================
   hydrate: () => {
     if (get().isHydrated) return;
 
-    if (typeof window === "undefined") {
-      set({ isHydrated: true });
-      return;
-    }
-
     try {
-      const rawUser = window.localStorage.getItem(USER_KEY);
-      const rawTenant = window.localStorage.getItem(TENANT_KEY);
-      const rawToken = window.localStorage.getItem(TOKEN_KEY);
+      const user = localStorage.getItem(USER_KEY);
+      const tenant = localStorage.getItem(TENANT_KEY);
+      const token = localStorage.getItem(TOKEN_KEY);
 
       set({
-        user: rawUser ? JSON.parse(rawUser) : null,
-        activeTenant: rawTenant ?? null,
-        token: rawToken ?? null,
+        user: user ? JSON.parse(user) : null,
+        activeTenant: tenant,
+        token,
         isHydrated: true,
       });
-
-      console.log("[AuthStore.web] Hydrated", {
-        hasUser: !!rawUser,
-        hasToken: !!rawToken,
-        tenant: rawTenant,
-      });
-    } catch (err) {
-      console.error("[AuthStore.web] Failed to hydrate auth", err);
-      set({
-        user: null,
-        activeTenant: null,
-        token: null,
-        isHydrated: true,
-      });
+    } catch {
+      set({ isHydrated: true });
     }
   },
+
+  setAuthReady: (ready) => set({ authReady: ready }),
 }));

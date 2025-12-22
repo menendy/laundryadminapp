@@ -19,7 +19,7 @@ export default {
   version: "1.0.0",
   
 plugins: [
-    "expo-web-browser",
+    //"expo-web-browser",
 
     [
       "@react-native-firebase/app",

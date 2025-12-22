@@ -5,7 +5,17 @@ import { useRouter, usePathname } from "expo-router";
 import { getUserProfile } from "../../services/api/usersService";
 import { handleBackendError } from "../../utils/handleBackendError";
 import { useSnackbarStore } from "../../store/useSnackbarStore";
-import { signOut, auth } from "../../services/firebase";
+//import { signOut, auth } from "../../services/firebase";
+import { Platform } from "react-native";
+
+// WEB
+import { auth as webAuth } from "../../services/firebase.web";
+
+// NATIVE
+import authNative from "@react-native-firebase/auth";
+
+import { useAuthStore } from "../../store/useAuthStore";
+
 
 interface RightValueProps {
   text: string;
@@ -223,11 +233,23 @@ export default function ProfilAkun() {
       <List.Item
         title="Logout"
         left={() => <List.Icon icon="logout" />}
-        onPress={() => {
-          signOut(auth);
-          router.replace("/auth/login");
+        onPress={async () => {
+          try {
+            if (Platform.OS === "web") {
+              await webAuth.signOut();
+            } else {
+              await authNative().signOut(); // ✅ INI WAJIB DI MOBILE
+            }
+          } catch (err) {
+            console.warn("Logout error (ignored):", err);
+          } finally {
+            // bersihkan store APAPUN yang terjadi
+            useAuthStore.getState().logout();
+            router.replace("/auth/login");
+          }
         }}
       />
+
     </View>
   );
 }
