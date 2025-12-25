@@ -1,5 +1,6 @@
 export const firebaseErrorMessages: Record<string, string> = {
   "auth/invalid-email": "Format email tidak valid.",
+  "auth/user-disabled": "Akun ini telah dinonaktifkan.",
   "auth/user-not-found": "Akun tidak ditemukan.",
   "auth/wrong-password": "Password salah.",
   "auth/missing-password": "Password belum diisi.",

@@ -1,4 +1,6 @@
+// services/firebase.ts
 import { Platform } from "react-native";
+import { getAuth } from "@react-native-firebase/auth";
 
 let firebase: any;
 
@@ -9,28 +11,47 @@ if (Platform.OS === "web") {
 }
 
 // ===============================
-// 🔐 EXISTING
+// 🔐 AUTH (LEGACY EXPORT — JANGAN DIPAKAI BARU)
 // ===============================
 export const auth = firebase.auth;
-export const signInWithEmailAndPassword = firebase.signInWithEmailAndPassword;
+
+// ===============================
+// 🔐 BASIC AUTH
+// ===============================
+export const signInWithEmailAndPassword =
+  firebase.signInWithEmailAndPassword;
+
 export const signOut = firebase.signOut;
-export const sendPasswordResetEmail = firebase.sendPasswordResetEmail;
+
+export const sendPasswordResetEmail =
+  firebase.sendPasswordResetEmail;
 
 // ===============================
-// 🔑 GOOGLE (TAMBAHAN, TANPA UBAH POLA)
+// 🔑 GOOGLE
 // ===============================
-export const signInWithGooglePopup = firebase.signInWithGooglePopup;
-export const signInWithGoogleCredential = firebase.signInWithGoogleCredential;
-export const signInWithGoogleNative = firebase.signInWithGoogleNative;
+export const signInWithGooglePopup =
+  firebase.signInWithGooglePopup;
 
+export const signInWithGoogleCredential =
+  firebase.signInWithGoogleCredential;
+
+export const signInWithGoogleNative =
+  firebase.signInWithGoogleNative;
 
 // ===============================
-// 🔄 TOKEN (UNIVERSAL)
+// 🔄 TOKEN (SAFE, SINGLE SOURCE)
 // ===============================
-export const getIdToken = async (
-  user: any,
+export const getFreshIdToken = async (
   forceRefresh = false
 ): Promise<string> => {
-  if (!user) throw new Error("User is null");
-  return user.getIdToken(forceRefresh);
+  const user =
+    Platform.OS === "web"
+      ? firebase.auth?.currentUser
+      : getAuth().currentUser;
+
+  if (!user) {
+    throw new Error("Firebase user is null");
+  }
+
+  return user.(forceRefresh);
 };

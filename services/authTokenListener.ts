@@ -2,34 +2,46 @@
 import { Platform } from "react-native";
 import { useAuthStore } from "../store/useAuthStore";
 
-// WEB
+// 🌐 WEB
 import { auth as webAuth } from "./firebase.web";
 
-// NATIVE
-import authNative from "@react-native-firebase/auth";
+// 📱 NATIVE (MODULAR API)
+import {
+  getAuth,
+  onIdTokenChanged,
+  getIdToken,
+} from "@react-native-firebase/auth";
 
 /**
- * Firebase AUTH STATE LISTENER
- * - ctrl + R
- * - refresh tab
- * - app resume
- * - login / logout
+ * 🔐 AUTH + TOKEN LISTENER
+ * - Dipanggil sekali saat app bootstrap
+ * - Menangani:
+ *   - restore session
+ *   - login / logout
+ *   - auto refresh token
  */
 export function initAuthTokenListener() {
   const store = useAuthStore.getState();
 
   const handleUser = async (user: any) => {
-    // ❌ BELUM LOGIN / LOGOUT
+    // 🚪 LOGOUT / SESSION HILANG
     if (!user) {
       store.logout();
-      store.setAuthReady(true); // ⬅️ auth state resolved
+      store.setAuthReady(true);
       return;
     }
 
-    const token = await user.getIdToken();
+    // ✅ WEB vs NATIVE (MODULAR)
+    const token =
+      Platform.OS === "web"
+        ? await user.getIdToken() // Firebase Web SDK (AMAN)
+        : await getIdToken(user); // RNFirebase Modular (WAJIB)
 
     store.login(
-      { uid: user.uid, email: user.email ?? "" },
+      {
+        uid: user.uid,
+        email: user.email ?? "",
+      },
       store.activeTenant,
       token
     );
@@ -39,9 +51,9 @@ export function initAuthTokenListener() {
 
   // 🌐 WEB
   if (Platform.OS === "web") {
-    return webAuth.onAuthStateChanged(handleUser);
+    return webAuth.current.onIdTokenChanged(handleUser);
   }
 
   // 📱 NATIVE
-  return authNative().onAuthStateChanged(handleUser);
+  return onIdTokenChanged(getAuth(), handleUser);
 }

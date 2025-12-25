@@ -4,6 +4,11 @@ import { View, Pressable, Text, Platform } from "react-native";
 import { Button } from "react-native-paper";
 import { useRouter } from "expo-router";
 
+import {
+  getAuth,
+  signInWithEmailAndPassword,
+} from "@react-native-firebase/auth";
+
 // WEB
 import {
   auth as webAuth,
@@ -11,13 +16,13 @@ import {
   signInWithGooglePopup,
 } from "../../services/firebase.web";
 
-// NATIVE
-import authNative from "@react-native-firebase/auth";
 
+
+// NATIVE GOOGLE
 import { useGoogleAuthNative } from "../../services/authGoogle.native";
+
 import { loginUser } from "../../services/api/authService";
 import { useSnackbarStore } from "../../store/useSnackbarStore";
-import { useAuthStore } from "../../store/useAuthStore";
 import { firebaseErrorMessages } from "../../services/firebase-error";
 
 import ValidatedInput from "../../components/ui/ValidatedInput";
@@ -25,29 +30,44 @@ import ValidatedInput from "../../components/ui/ValidatedInput";
 export default function LoginScreen() {
   const router = useRouter();
   const showSnackbar = useSnackbarStore((s) => s.showSnackbar);
-  const { login: loginStore } = useAuthStore.getState();
   const { signInWithGoogle } = useGoogleAuthNative();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
   // ============================
   // 🔐 AFTER LOGIN SUCCESS
   // ============================
-  const afterLoginSuccess = async (fbUser: any) => {
-    const claimRes = await loginUser({ uid: fbUser.uid });
-    if (!claimRes.success) return;
+  const afterLoginSuccess = async (): Promise<boolean> => {
+    const user =
+      Platform.OS === "web"
+        ? webAuth.current.currentUser
+        : getAuth().currentUser;
 
-    const idToken = await fbUser.getIdToken(true);
+    if (!user) {
+      throw new Error("Firebase user null after login");
+    }
 
-    loginStore(
-      { uid: fbUser.uid, email: fbUser.email ?? "" },
-      claimRes.active_tenant,
-      idToken
-    );
+    try {
+      await loginUser({ uid: user.uid });
 
-    router.replace("/");
+      // ✅ backend OK
+      router.replace("/");
+      return true;
+    } catch (err: any) {
+      const data = err?.response?.data;
+
+      // 🔥 BACKEND ERROR → SNACKBAR SAJA
+      if (data?.message) {
+        showSnackbar(data.message, "error");
+        return false; // ⛔ stop flow
+      }
+
+      // 🔥 ERROR TEKNIS → lempar ke atas
+      throw err;
+    }
   };
 
 
@@ -59,27 +79,14 @@ export default function LoginScreen() {
     try {
       setLoading(true);
 
-      let fbUser;
-
       if (Platform.OS === "web") {
-        const userCred = await signInWithEmailWeb(
-          webAuth,
-          email,
-          password
-        );
-        fbUser = userCred.user;
+        await signInWithEmailWeb(webAuth.current, email, password);
       } else {
-        const userCred = await authNative().signInWithEmailAndPassword(
-          email,
-          password
-        );
-        fbUser = userCred.user;
+        await signInWithEmailAndPassword(getAuth(), email, password);
       }
 
-      await afterLoginSuccess(fbUser);
+      await afterLoginSuccess();
     } catch (err: any) {
-      console.log("EMAIL LOGIN ERROR:", err?.code, err?.message);
-
       const message =
         firebaseErrorMessages[err?.code] ||
         "Tidak dapat login. Periksa email dan password Anda.";
@@ -90,28 +97,27 @@ export default function LoginScreen() {
     }
   };
 
-
   // ============================
-  // 🔑 LOGIN GOOGLE (FINAL)
+  // 🔑 LOGIN GOOGLE
   // ============================
   const handleLoginGoogle = async () => {
     try {
       setLoading(true);
 
-      // 🌐 WEB (Firebase popup)
       if (Platform.OS === "web") {
-        const result = await signInWithGooglePopup();
-        await afterLoginSuccess(result.user);
-        return;
+        await signInWithGooglePopup();
+      } else {
+        await signInWithGoogle();
       }
 
-      // 📱 MOBILE (expo-auth-session)
-      const result = await signInWithGoogle();
-      await afterLoginSuccess(result.user);
+      await afterLoginSuccess();
+    } catch (err: any) {
+      const message =
+        firebaseErrorMessages[err?.code] ||
+        "Tidak dapat login. Periksa email dan password Anda.";
 
-    } catch (err) {
-      console.error("Google Login ERROR:", err);
-      showSnackbar("Login Google gagal.", "error");
+      showSnackbar(message, "error");
+      //showSnackbar("Login Google gagal.", "error");
     } finally {
       setLoading(false);
     }
@@ -157,6 +163,20 @@ export default function LoginScreen() {
         <Text style={{ marginHorizontal: 10, color: "#888" }}>atau</Text>
         <View style={{ flex: 1, height: 1, backgroundColor: "#DDD" }} />
       </View>
+
+      {formError && (
+        <Text
+          style={{
+            color: "#E53935",
+            fontSize: 13,
+            textAlign: "center",
+            marginTop: 6,
+            marginBottom: 4,
+          }}
+        >
+          {formError}
+        </Text>
+      )}
 
       <Button
         mode="outlined"

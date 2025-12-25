@@ -74,3 +74,29 @@ export const getGlobalUserList = async (
     };
   }
 };
+
+export const getGlobalUserById = async (id: string) => {
+  const res = await api.get(`/getGlobalUserDetail?id=${id}`);
+  return res.data;
+};
+
+export const updateGlobalUser = async (
+  id: string,
+  payload: GlobalUserPayload
+) => {
+  const res = await api.put(`/updateGlobalUser?id=${id}`, payload);
+  return res.data;
+};
+
+export const deleteGlobalUser = async (
+  globalUserId: string,
+  payload: GlobalUserPayload
+) => {
+  const body = {
+    globalUserId,
+    ...payload
+  };
+
+  const res = await api.post("/deleteGlobalUser", body);
+  return res.data;
+};

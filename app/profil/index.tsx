@@ -1,21 +1,17 @@
+// app/profil/index.tsx
 import React, { useEffect, useState } from "react";
 import { View, TouchableOpacity, StyleSheet } from "react-native";
 import { Text, Avatar, List } from "react-native-paper";
 import { useRouter, usePathname } from "expo-router";
+import { Platform } from "react-native";
+
 import { getUserProfile } from "../../services/api/usersService";
 import { handleBackendError } from "../../utils/handleBackendError";
 import { useSnackbarStore } from "../../store/useSnackbarStore";
-//import { signOut, auth } from "../../services/firebase";
-import { Platform } from "react-native";
-
-// WEB
-import { auth as webAuth } from "../../services/firebase.web";
-
-// NATIVE
-import authNative from "@react-native-firebase/auth";
-
 import { useAuthStore } from "../../store/useAuthStore";
 
+// ✅ SATU-SATUNYA CARA LOGOUT
+import { signOut } from "../../services/firebase";
 
 interface RightValueProps {
   text: string;
@@ -38,8 +34,9 @@ export default function ProfilAkun() {
     outlet_default: null,
   });
 
-
-
+  // ============================
+  // 🔠 UTIL
+  // ============================
   const getInitials = (fullName: string) =>
     fullName
       ?.trim()
@@ -71,11 +68,15 @@ export default function ProfilAkun() {
     </View>
   );
 
+  // ============================
+  // 🔄 LOAD PROFILE
+  // ============================
   useEffect(() => {
     const load = async () => {
       const res = await getUserProfile();
-      const success = handleBackendError(res, () => { }, showSnackbar);
+      const success = handleBackendError(res, () => {}, showSnackbar);
       if (!success) return;
+
       if (res.profile) {
         setProfile({
           ...res.profile,
@@ -88,7 +89,7 @@ export default function ProfilAkun() {
 
   return (
     <View style={styles.container}>
-      {/* AVATAR SECTION */}
+      {/* ================= AVATAR ================= */}
       <View style={styles.avatarContainer}>
         <TouchableOpacity onPress={() => router.push("/profil/ubahFoto")}>
           {profile.photo_url ? (
@@ -100,8 +101,7 @@ export default function ProfilAkun() {
         <Text style={styles.editPhotoText}>Ubah</Text>
       </View>
 
-
-      {/* SECTION 1 → OUTLET */}
+      {/* ================= OUTLET ================= */}
       <View style={styles.sectionCard}>
         <List.Item
           title="Outlet"
@@ -112,15 +112,11 @@ export default function ProfilAkun() {
             />
           )}
           onPress={() => router.push("/profil/editOutlet")}
-          android_ripple={{ color: "transparent" }}
         />
       </View>
 
-
-
-      {/* SECTION 1 → Nama + Bio */}
+      {/* ================= NAMA + ALAMAT ================= */}
       <View style={styles.sectionCard}>
-
         <List.Item
           title="Nama"
           right={() => <RightValue text={profile.name || "Atur Sekarang"} />}
@@ -152,14 +148,13 @@ export default function ProfilAkun() {
             })
           }
         />
-
       </View>
 
-      {/* SECTION 2 → Jenis Kelamin + Tanggal Lahir */}
+      {/* ================= GENDER + BIRTHDAY ================= */}
       <View style={styles.sectionCard}>
         <List.Item
-          title=" Jenis Kelamin"
-          right={() => <RightValue text={profile.address || "Atur Sekarang"} />}
+          title="Jenis Kelamin"
+          right={() => <RightValue text={profile.gender || "Atur Sekarang"} />}
           onPress={() =>
             router.push({
               pathname: "/profil/modal/[field]",
@@ -175,7 +170,7 @@ export default function ProfilAkun() {
         <View style={styles.divider} />
 
         <List.Item
-          title=" Tanggal Lahir"
+          title="Tanggal Lahir"
           right={() => <RightValue text={profile.birthday || "Atur Sekarang"} />}
           onPress={() =>
             router.push({
@@ -188,14 +183,15 @@ export default function ProfilAkun() {
             })
           }
         />
-
       </View>
 
-      {/* SECTION 3 → HP + Email */}
+      {/* ================= PHONE + EMAIL ================= */}
       <View style={styles.sectionCard}>
         <List.Item
           title="No. Handphone"
-          right={() => <RightValue text={maskPhone(profile.phone) || "Atur Sekarang"} />}
+          right={() => (
+            <RightValue text={maskPhone(profile.phone) || "Atur Sekarang"} />
+          )}
           onPress={() =>
             router.push({
               pathname: "/profil/modal/[field]",
@@ -208,48 +204,42 @@ export default function ProfilAkun() {
           }
         />
 
-
         <View style={styles.divider} />
 
         <List.Item
           title="Email"
-          right={() => <RightValue text={maskEmail(profile.email) || "Atur Sekarang"} />}
+          right={() => (
+            <RightValue text={maskEmail(profile.email) || "Atur Sekarang"} />
+          )}
           onPress={() =>
             router.push({
               pathname: "/profil/modal/[field]",
               params: {
                 field: "email",
-                label: "email",
+                label: "Email",
                 value: profile.email,
               },
             })
           }
         />
-
-
       </View>
 
-      {/* Logout tanpa arrow */}
+      {/* ================= LOGOUT ================= */}
       <List.Item
         title="Logout"
         left={() => <List.Icon icon="logout" />}
         onPress={async () => {
           try {
-            if (Platform.OS === "web") {
-              await webAuth.signOut();
-            } else {
-              await authNative().signOut(); // ✅ INI WAJIB DI MOBILE
-            }
+            await signOut(); // ✅ WEB + MOBILE, TANPA WARNING
           } catch (err) {
             console.warn("Logout error (ignored):", err);
           } finally {
-            // bersihkan store APAPUN yang terjadi
+            // fallback (auth listener juga akan jalan)
             useAuthStore.getState().logout();
             router.replace("/auth/login");
           }
         }}
       />
-
     </View>
   );
 }

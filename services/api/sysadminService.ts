@@ -2,7 +2,7 @@ import { api } from "./client";
 
 
 export interface SysadminPayload {
- 
+
 }
 
 export interface SysadminResponse {
@@ -41,8 +41,8 @@ export interface SysadminListResponse {
 }
 
 export const getSysadminList = async (
-  rootPath: string,                   
-  basePath: string,                    
+  rootPath: string,
+  basePath: string,
   search: string | null = null,
   cursor: string | null = null,
   limit = 10,
@@ -85,7 +85,28 @@ export interface UpdateSysadminPayload {
 }
 
 
-export const updateSysadmin = async (payload: UpdateSysadminPayload) => {
-  const res = await api.put("/updateSysadmin", payload);
+// export const updateSysadmin = async (payload: UpdateSysadminPayload) => {
+//   const res = await api.put("/updateSysadmin", payload);
+//   return res.data;
+// };
+
+export const updateSysadmin = async (
+  id: string,
+  payload: UpdateSysadminPayload
+) => {
+  const res = await api.put(`/updateSysadmin?id=${id}`, payload);
+  return res.data;
+};
+
+export const deleteSysadmin = async (
+  sysadminId: string,
+  payload: UpdateSysadminPayload
+) => {
+  const body = {
+    sysadminId,
+    ...payload
+  };
+
+  const res = await api.post("/deleteSysadmin", body);
   return res.data;
 };

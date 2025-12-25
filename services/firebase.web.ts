@@ -3,32 +3,51 @@ import { initializeApp, getApps } from "firebase/app";
 import {
   getAuth,
   signInWithEmailAndPassword,
-  getIdToken,                // ✅ SDK ASLI
   signOut,
-  sendPasswordResetEmail,
+  sendPasswordResetEmail as firebaseSendPasswordResetEmail,
   GoogleAuthProvider,
   signInWithPopup,
 } from "firebase/auth";
 
 import { firebaseConfig } from "./firebaseConfig";
 
-const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
-export const auth = getAuth(app);
+let _auth: ReturnType<typeof getAuth> | null = null;
 
-// ===============================
-// ✅ EXISTING EXPORT (JANGAN DIUBAH POLANYA)
-// ===============================
-export {
-  signInWithEmailAndPassword,
-  getIdToken,               // 🔥 INI DARI SDK, BUKAN WRAPPER
-  signOut,
-  sendPasswordResetEmail,
+function getWebAuth() {
+  if (!_auth) {
+    const app =
+      getApps().length > 0
+        ? getApps()[0]
+        : initializeApp(firebaseConfig);
+
+    _auth = getAuth(app);
+  }
+  return _auth;
+}
+
+export const auth = {
+  get current() {
+    return getWebAuth();
+  },
 };
 
 // ===============================
-// 🔑 GOOGLE LOGIN (WEB) — TETAP ADA
+// 🔐 WRAPPER (INI KUNCI FIX)
+// ===============================
+export const sendPasswordResetEmail = async (_auth: any, email: string) => {
+  return firebaseSendPasswordResetEmail(getWebAuth(), email);
+};
+
+// ===============================
+// EXPORT LAIN (AMAN)
+// ===============================
+export { signInWithEmailAndPassword, signOut };
+
+// ===============================
+// GOOGLE LOGIN (WEB ONLY)
 // ===============================
 export const signInWithGooglePopup = async () => {
+  const auth = getWebAuth();
   const provider = new GoogleAuthProvider();
   provider.setCustomParameters({ prompt: "select_account" });
   return await signInWithPopup(auth, provider);

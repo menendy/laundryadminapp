@@ -89,3 +89,16 @@ export const updateOwner = async (
   const res = await api.put(`/updateOwner?id=${id}`, payload);
   return res.data;
 };
+
+export const deleteOwner = async (
+  ownerId: string,
+  payload: OwnerPayload
+) => {
+  const body = {
+    ownerId,
+    ...payload
+  };
+
+  const res = await api.post("/deleteOwner", body);
+  return res.data;
+};

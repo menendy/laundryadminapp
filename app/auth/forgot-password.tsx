@@ -19,40 +19,50 @@ export default function ForgotPasswordScreen() {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<any>({});
 
-  const handleSend = async () => {
-    if (!email.trim()) {
-      setErrors({ email: "Email wajib diisi" });
-      return;
-    }
+const handleSend = async () => {
+  if (!email.trim()) {
+    setErrors({ email: "Email wajib diisi" });
+    return;
+  }
 
-    try {
-      setLoading(true);
+  setLoading(true);
+  setErrors({});
 
-      // 1️⃣ Validasi via backend (optional tapi recommended)
-      const check = await checkForgotPassword({ email: email.trim() });
-      const ok = handleBackendError(check, setErrors, showSnackbar);
-      if (!ok) return;
+  // ============================
+  // 1️⃣ VALIDASI BACKEND
+  // ============================
+  const check = await checkForgotPassword({ email: email.trim() });
+  const ok = handleBackendError(check, setErrors, showSnackbar);
 
-      // 2️⃣ KIRIM EMAIL VIA FIREBASE (INI YANG BENAR)
-      await sendPasswordResetEmail(auth, email.trim());
+  if (!ok) {
+    setLoading(false);
+    return; // ⛔ STOP DI SINI, JANGAN LANJUT KE FIREBASE
+  }
 
-      showSnackbar(
-        "Email reset password telah dikirim. Silakan cek inbox Anda.",
-        "success"
-      );
+  // ============================
+  // 2️⃣ FIREBASE RESET PASSWORD
+  // ============================
+  try {
+    await sendPasswordResetEmail(auth, email.trim());
 
-      router.back();
-    } catch (err: any) {
-      console.error("forgot password error:", err);
+    showSnackbar(
+      "Email reset password telah dikirim. Silakan cek inbox Anda.",
+      "success"
+    );
 
-      showSnackbar(
-        "Gagal mengirim email reset password. Silakan coba lagi.",
-        "error"
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
+    router.back();
+  } catch (err: any) {
+    console.error("forgot password firebase error:", err);
+
+    showSnackbar(
+      "Gagal mengirim email reset password. Silakan coba lagi.",
+      "error"
+    );
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   return (
     <View style={{ padding: 20, marginTop: 60 }}>
@@ -64,14 +74,17 @@ export default function ForgotPasswordScreen() {
         Masukkan email yang terdaftar untuk menerima link reset password.
       </Text>
 
-      <ValidatedInput
-        label="Email"
-        value={email}
-        onChangeText={setEmail}
-        error={errors.email}
-        keyboardType="email-address"
-        required
-      />
+     <ValidatedInput
+  label="Email"
+  value={email}
+  onChangeText={setEmail}
+  error={errors.email}
+  keyboardType="email-address"
+  autoComplete="off"
+  textContentType="none"
+  required
+/>
+
 
       <Button
         mode="contained"

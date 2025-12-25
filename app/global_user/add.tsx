@@ -18,12 +18,12 @@ export default function AddGlobalUser() {
 
   const [nama, setNama] = useState("");
   const [telp, setTelp] = useState("");
-  
+
   const [email, setEmail] = useState("");
   const [alias, setAlias] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
- 
+
 
   const [errors, setErrors] = useState<any>({});
   const [loading, setLoading] = useState(false);
@@ -63,7 +63,7 @@ export default function AddGlobalUser() {
       if (!ok) return;
 
       showSnackbar("berhasil ditambahkan", "success");
-      router.back();
+      //router.back();
     } catch (err) {
       console.error("🔥 Error addUserGlobal:", err);
       showSnackbar("Terjadi kesalahan koneksi", "error");
@@ -123,10 +123,18 @@ export default function AddGlobalUser() {
           label="Nomor Telepon"
           required
           keyboardType="phone-pad"
-          placeholder="contoh: 08123456789"
+          placeholder="812xxxxxxx"
           value={telp}
-          onChangeText={setTelp}
+          onChangeText={(v) => {
+            let clean = v.replace(/[^0-9]/g, "");
+
+            if (clean.startsWith("0")) clean = clean.substring(1);
+
+            // Jangan blokir update saat empty
+            setTelp(clean);
+          }}
           error={errors.telp}
+          prefix={<Text style={{ fontSize: 16, color: "#555" }}>+62</Text>}
         />
 
         <ValidatedInput

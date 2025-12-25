@@ -1,208 +1,312 @@
-import React, { useState, useEffect } from "react";
-import { View, ScrollView, Text, Pressable } from "react-native";
-import { Button, Checkbox } from "react-native-paper";
-
-import { useLocalSearchParams, useRouter } from "expo-router";
+import React, { useEffect, useState } from "react";
+import { View, StyleSheet, ScrollView } from "react-native";
+import { ActivityIndicator, List } from "react-native-paper";
+import { useRouter, useGlobalSearchParams } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import AppHeaderActions from "../../../components/ui/AppHeaderActions";
-import ValidatedInput from "../../../components/ui/ValidatedInput";
+import SectionListCard from "../../../components/ui/SectionListCard";
+import ToggleSwitch from "../../../components/ui/ToggleSwitch";
+import ConfirmBottomSheet from "../../../modals/ConfirmBottomSheet";
 
-import { getSysadminById, updateSysadmin  } from "../../../services/api/sysadminService";
+import {
+    getSysadminById,
+    updateSysadmin, 
+    deleteSysadmin
+} from "../../../services/api/sysadminService";
 
 import { useSnackbarStore } from "../../../store/useSnackbarStore";
 import { handleBackendError } from "../../../utils/handleBackendError";
-import ToggleSwitch from "../../../components/ui/ToggleSwitch";
+import { useBasePath } from "../../../utils/useBasePath";
+
+/* ================= TYPES ================= */
+
+interface SysadminFormData {
+    name: string;
+    alias: string;
+    phone: string;
+    email: string;
+}
+
+type EditParams = {
+    id?: string;
+    updatedField?: string;
+    updatedValue?: string;
+};
+
+/* ================= SCREEN ================= */
 
 export default function EditSysadminScreen() {
     const router = useRouter();
+    const params = useGlobalSearchParams<EditParams>();
+    const id = params.id;
+
+    const insets = useSafeAreaInsets();
+    const { rootBase: rootPath, basePath } = useBasePath();
     const showSnackbar = useSnackbarStore((s) => s.showSnackbar);
 
-    const { id } = useLocalSearchParams();
-    const [nama, setNama] = useState("");
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
     const [active, setActive] = useState(true);
-
-    const [telp, setTelp] = useState("");
-
-
-    const [email, setEmail] = useState("");
-    const [alias, setAlias] = useState("");
-    const [password, setPassword] = useState("");
-    const [confirm, setConfirm] = useState("");
-
-
     const [errors, setErrors] = useState<any>({});
-    const [loading, setLoading] = useState(false);
+    const [confirmDeleteVisible, setConfirmDeleteVisible] = useState(false);
 
-    const validate = () => {
-        const e: any = {};
+    const [confirmVisible, setConfirmVisible] = useState(false);
+    const [pendingActiveValue, setPendingActiveValue] = useState(active);
 
-        if (!nama.trim()) e.nama = "Nama tidak boleh kosong";
-        if (!telp.trim()) e.telp = "Nomor Telepon tidak boleh kosong";
+    const [data, setData] = useState<SysadminFormData>({
+        name: "",
+        alias: "",
+        phone: "",
+        email: "",
+    });
 
-        setErrors(e);
-        return Object.keys(e).length === 0;
-    };
+    /* ================= LOAD ================= */
 
-
-
-
-    useEffect(() => {
-        loadDetail();
-    }, [id]);
-
-    const loadDetail = async () => {
-        setLoading(true);
-
+    const loadData = async () => {
         try {
             const res = await getSysadminById(String(id));
-            const ok = handleBackendError(res, () => { }, showSnackbar);
-            if (!ok) return;
-            const d = res.data;
 
-            setNama(d.name ?? "");
-            setPassword("");
-            setConfirm("");
-            setTelp(d.phone ?? "");
-            setEmail(d.email ?? "");
-            setAlias(d.alias ?? "");
-            setActive(d.active ?? "");
+            setData({
+                name: res.data.name,
+                alias: res.data.alias ?? "",
+                phone: res.data.phone?.replace(/^(\+62|62)/, "") ?? "",
+                email: res.data.email ?? "",
+            });
 
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleUpdate = async () => {
-
-        if (!validate()) {
-            showSnackbar("Lengkapi data dengan benar", "error");
-            return;
-        }
-
-        try {
-
-            setLoading(true);
-            const payload = {
-                id: id,
-                name: nama.trim(),
-                alias: alias.trim(),
-                phone: telp.trim(),
-                email: email.trim(),
-                password: password,
-                confirm: confirm,
-                active: active,
-            }
-
-            const res = await updateSysadmin(payload);
-            const ok = handleBackendError(res, setErrors, showSnackbar);
-            if (!ok) return;
-
-            showSnackbar("Halaman berhasil diperbarui", "success");
-            router.back();
-
+            setActive(res.data.active);
         } catch (err) {
             handleBackendError(err, setErrors, showSnackbar);
         } finally {
             setLoading(false);
         }
+    };
 
+    useEffect(() => {
+        if (id) loadData();
+    }, [id]);
+
+    /* ================= REALTIME UPDATE ================= */
+
+    useEffect(() => {
+        if (!params.updatedField) return;
+
+        const f = params.updatedField;
+        const v = params.updatedValue ?? "";
+
+        if (f === "name") setData((p) => ({ ...p, name: v }));
+        if (f === "alias") setData((p) => ({ ...p, alias: v }));
+        if (f === "phone") setData((p) => ({ ...p, phone: v }));
+        if (f === "email") setData((p) => ({ ...p, email: v }));
+        if (f === "active") setActive(v === "true" || v === "1");
+
+        router.setParams({
+            updatedField: undefined,
+            updatedValue: undefined,
+        });
+    }, [params.updatedField, params.updatedValue]);
+
+    /* ================= ACTIONS ================= */
+
+    const goEdit = (field: string, label: string, value: string) =>
+        router.push({
+            pathname: "/sysadmin/edit/modal/[field]",
+            params: { id, field, label, value, rootPath, basePath },
+        });
+
+
+    const handleUpdateStatus = async (value: boolean) => {
+        try {
+            const res = await updateSysadmin(String(id), {
+                active: value,
+                rootPath,
+                basePath,
+            });
+
+            const ok = handleBackendError(res, setErrors, showSnackbar);
+            if (!ok) return false;
+
+            showSnackbar("Status diperbarui", "success");
+            return true;
+        } catch (err) {
+            handleBackendError(err, setErrors, showSnackbar);
+            return false;
+        }
+    };
+
+      const handleDelete = async () => {
+        try {
+          setSaving(true);
+          const res = await deleteSysadmin(String(id), { rootPath, basePath });
+          const ok = handleBackendError(res, setErrors, showSnackbar);
+          if (!ok) return false;
+          showSnackbar("Berhasil dihapus", "success");
+          return true;
+        } finally {
+          setSaving(false);
+        }
+      };
+
+    /* ================= UI ================= */
+
+    if (loading) {
+        return (
+            <View style={{ flex: 1, justifyContent: "center" }}>
+                <ActivityIndicator size="large" />
+            </View>
+        );
     }
 
-
-
-
-
     return (
-        <View style={{ flex: 1, backgroundColor: "#f9f9f9" }}>
-            <AppHeaderActions title="Tambah Sysadmin" showBack />
+        <View style={styles.container}>
+            <AppHeaderActions showBack title="Data Sysadmin" />
 
             <ScrollView
-                contentContainerStyle={{
-                    padding: 20,
-                    paddingBottom: 120, // 👈 Tambah jarak aman untuk tombol + navbar
-                }}
-                keyboardShouldPersistTaps="handled" // 👈 optional biar input tetap fokus
+                style={styles.scroll}
+                contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}
+                showsVerticalScrollIndicator={false}
             >
-                {/* STATUS */}
-                <View style={{ marginTop: 20 }}>
-                    <Text style={{ fontWeight: "700", marginBottom: 10 }}>
-                        Aktif
-                    </Text>
-
-                    <View style={{ flexDirection: "row", alignItems: "center" }}>
-                        <ToggleSwitch value={active} onChange={setActive} />
-                        <Text style={{ marginLeft: 10, fontSize: 15, fontWeight: "600" }}>
-                            {active ? "Aktif" : "Nonaktif"}
-                        </Text>
-                    </View>
-                </View>
-
-                <ValidatedInput
-                    label="Nama Lengkap"
-                    required
-                    placeholder="Contoh: Ridwan Tamar"
-                    value={nama}
-                    onChangeText={setNama}
-                    error={errors.nama}
+                <ConfirmBottomSheet
+                    visible={confirmVisible}
+                    title={pendingActiveValue ? "Aktifkan Akun?" : "Nonaktifkan Akun?"}
+                    message={
+                        pendingActiveValue
+                            ? "Apakah Anda yakin ingin mengaktifkan akun sysadmin ini?"
+                            : "Apakah Anda yakin ingin menonaktifkan akun sysadmin ini?"
+                    }
+                    confirmText="Ya, Lanjutkan"
+                    cancelText="Batal"
+                    onConfirm={async () => {
+                        setConfirmVisible(false);
+                        setActive(pendingActiveValue);
+                        await handleUpdateStatus(pendingActiveValue);
+                    }}
+                    onCancel={() => {
+                        setConfirmVisible(false);
+                        setActive(active);
+                    }}
                 />
 
-                <ValidatedInput
-                    label="Password"
-                    required
-                    value={password}
-                    onChangeText={setPassword}
-                    error={errors.password}
-                    secureTextEntry
+                <ConfirmBottomSheet
+                    visible={confirmDeleteVisible}
+                    title="Hapus Pengguna?"
+                    message="Apakah Anda yakin ingin menghapus pengguna ini?"
+                    confirmText="Ya, Hapus"
+                    cancelText="Batal"
+                    onConfirm={async () => {
+                        setConfirmDeleteVisible(false);
+
+                        const prev = active; // simpan state lama untuk rollback jika perlu
+                        try {
+                            setSaving(true);
+
+                            // panggil API delete
+                            const ok = await handleDelete();
+                            if (!ok) {
+                                setActive(prev); // rollback UI kalau gagal
+                                return;
+                            }
+
+                            showSnackbar("Berhasil dihapus", "success");
+
+                            // kembali ke halaman daftar
+                            router.replace("/sysadmin");
+                        } catch (err) {
+                            handleBackendError(err, setErrors, showSnackbar);
+                            setActive(prev);
+                        } finally {
+                            setSaving(false);
+                        }
+                    }}
+
+                    onCancel={() => {
+                        setConfirmDeleteVisible(false);
+                    }}
                 />
 
-                <ValidatedInput
-                    label="Konfirmasi Password"
-                    required
-                    value={confirm}
-                    onChangeText={setConfirm}
-                    error={errors.confirm}
-                    secureTextEntry
+                {/* === STATUS === */}
+                <SectionListCard
+                    style={{ marginTop: 16 }}
+                    title="Status Akun"
+                    items={[
+                        {
+                            label: "Status",
+                            value: active ? "Aktif" : "Nonaktif",
+                            right: () => (
+                                <ToggleSwitch
+                                    value={active}
+                                    disabled={saving}
+                                    onChange={(val) => {
+                                        setPendingActiveValue(val);
+                                        setConfirmVisible(true);
+                                    }}
+                                />
+                            ),
+                        },
+                    ]}
                 />
 
-                <ValidatedInput
-                    label="Nama Panggilan"
-
-                    placeholder="Contoh: Ridwan"
-                    value={alias}
-                    onChangeText={setAlias}
-                    error={errors.nama}
+                {/* === DATA === */}
+                <SectionListCard
+                    title="Data Sysadmin"
+                    items={[
+                        ["name", "Nama Lengkap"],
+                        ["alias", "Nama Panggilan"],
+                        ["phone", "No. Handphone"],
+                        ["email", "Email"],
+                    ].map(([field, label]) => ({
+                        label,
+                        value:
+                            field === "phone"
+                                ? data.phone
+                                    ? `+62${data.phone}`
+                                    : "Atur Sekarang"
+                                : (data as any)[field] || "Atur Sekarang",
+                        right: () => <List.Icon icon="chevron-right" />,
+                        onPress: () => goEdit(field, label, (data as any)[field]),
+                    }))}
                 />
 
-                <ValidatedInput
-                    label="Nomor Telepon"
-                    required
-                    keyboardType="phone-pad"
-                    placeholder="contoh: 08123456789"
-                    value={telp}
-                    onChangeText={setTelp}
-                    error={errors.telp}
+                {/* === DELETE === */}
+                <SectionListCard
+                    title=""
+                    items={[
+                        {
+                            label: "Hapus Pengguna Sysadmin",
+                            value: "",
+                            right: () => <List.Icon icon="delete-outline" color="red" />,
+                            onPress: () => setConfirmDeleteVisible(true),
+                            labelStyle: { color: "red", fontWeight: "500", fontSize: 15 },
+                        },
+                    ]}
                 />
 
-                <ValidatedInput
-                    label="Email"
-                    required
-                    keyboardType="email-address"
-                    placeholder="contoh: laundry@gmail.com"
-                    value={email}
-                    onChangeText={setEmail}
-                    error={errors.telp}
-                />
 
-                <Button
-                    mode="contained"
-                    onPress={handleUpdate}
-                    loading={loading}
-                    disabled={loading}
-                    style={{ marginTop: 25 }}
-                >
-                    {loading ? "Menyimpan..." : "Tambah Sysadmin"}
-                </Button>
             </ScrollView>
+
+            {saving && (
+                <View style={styles.loadingOverlay}>
+                    <ActivityIndicator size="large" color="#fff" />
+                </View>
+            )}
         </View>
     );
 }
+
+/* ================= STYLES ================= */
+
+const styles = StyleSheet.create({
+    container: { flex: 1, backgroundColor: "#F4F4F4" },
+    scroll: { flex: 1 },
+    loadingOverlay: {
+        position: "absolute",
+        top: 0,
+        bottom: 0,
+        left: 0,
+        right: 0,
+        backgroundColor: "rgba(0,0,0,0.4)",
+        justifyContent: "center",
+        alignItems: "center",
+        zIndex: 999,
+    },
+});

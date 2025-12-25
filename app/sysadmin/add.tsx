@@ -18,12 +18,12 @@ export default function AddSysadminScreen() {
 
   const [nama, setNama] = useState("");
   const [telp, setTelp] = useState("");
-  
+
   const [email, setEmail] = useState("");
   const [alias, setAlias] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
- 
+
 
   const [errors, setErrors] = useState<any>({});
   const [loading, setLoading] = useState(false);
@@ -32,7 +32,9 @@ export default function AddSysadminScreen() {
     const e: any = {};
 
     if (!nama.trim()) e.nama = "Nama tidak boleh kosong";
+    if (!password.trim()) e.password = "Password tidak boleh kosong";
     if (!telp.trim()) e.telp = "Nomor Telepon tidak boleh kosong";
+     if (!email.trim()) e.email = "Email tidak boleh kosong";
 
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -89,7 +91,7 @@ export default function AddSysadminScreen() {
           placeholder="Contoh: Ridwan Tamar"
           value={nama}
           onChangeText={setNama}
-          error={errors.nama}
+          error={errors.name}
         />
 
         <ValidatedInput
@@ -123,10 +125,18 @@ export default function AddSysadminScreen() {
           label="Nomor Telepon"
           required
           keyboardType="phone-pad"
-          placeholder="contoh: 08123456789"
+          placeholder="812xxxxxxx"
           value={telp}
-          onChangeText={setTelp}
+          onChangeText={(v) => {
+            let clean = v.replace(/[^0-9]/g, "");
+
+            if (clean.startsWith("0")) clean = clean.substring(1);
+
+            // Jangan blokir update saat empty
+            setTelp(clean);
+          }}
           error={errors.telp}
+          prefix={<Text style={{ fontSize: 16, color: "#555" }}>+62</Text>}
         />
 
         <ValidatedInput
@@ -136,7 +146,7 @@ export default function AddSysadminScreen() {
           placeholder="contoh: laundry@gmail.com"
           value={email}
           onChangeText={setEmail}
-          error={errors.telp}
+          error={errors.email}
         />
 
         <Button

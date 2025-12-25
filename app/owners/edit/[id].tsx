@@ -12,6 +12,7 @@ import ConfirmBottomSheet from "../../../modals/ConfirmBottomSheet";
 import {
   getOwnerById,
   updateOwner,
+  deleteOwner
 } from "../../../services/api/ownersService";
 
 import { useSnackbarStore } from "../../../store/useSnackbarStore";
@@ -49,6 +50,7 @@ export default function EditOwnerScreen() {
   const [active, setActive] = useState(true);
   const [pendingActive, setPendingActive] = useState(true);
   const [confirmVisible, setConfirmVisible] = useState(false);
+  const [confirmDeleteVisible, setConfirmDeleteVisible] = useState(false);
 
   const [errors, setErrors] = useState<any>({});
 
@@ -138,6 +140,19 @@ export default function EditOwnerScreen() {
     );
   }
 
+   const handleDelete = async () => {
+          try {
+            setSaving(true);
+            const res = await deleteOwner(String(id), { rootPath, basePath });
+            const ok = handleBackendError(res, setErrors, showSnackbar);
+            if (!ok) return false;
+            showSnackbar("Berhasil dihapus", "success");
+            return true;
+          } finally {
+            setSaving(false);
+          }
+        };
+
   return (
     <View style={styles.container}>
       <AppHeaderActions showBack title="Data Owner" />
@@ -162,6 +177,45 @@ export default function EditOwnerScreen() {
             if (ok) setActive(pendingActive);
           }}
           onCancel={() => setConfirmVisible(false)}
+        />
+
+
+
+        <ConfirmBottomSheet
+          visible={confirmDeleteVisible}
+          title="Hapus Pengguna?"
+          message="Apakah Anda yakin ingin menghapus pengguna ini?"
+          confirmText="Ya, Hapus"
+          cancelText="Batal"
+          onConfirm={async () => {
+            setConfirmDeleteVisible(false);
+
+            const prev = active; // simpan state lama untuk rollback jika perlu
+            try {
+              setSaving(true);
+
+              // panggil API delete
+              const ok = await handleDelete();
+              if (!ok) {
+                setActive(prev); // rollback UI kalau gagal
+                return;
+              }
+
+              showSnackbar("Berhasil dihapus", "success");
+
+              // kembali ke halaman daftar
+              router.replace("/owners");
+            } catch (err) {
+              handleBackendError(err, setErrors, showSnackbar);
+              setActive(prev);
+            } finally {
+              setSaving(false);
+            }
+          }}
+
+          onCancel={() => {
+            setConfirmDeleteVisible(false);
+          }}
         />
 
         {/* === SECTION 1: STATUS === */}
@@ -210,14 +264,47 @@ export default function EditOwnerScreen() {
             },
           ]}
         />
+
+        {/* === DELETE === */}
+        <SectionListCard
+          title=""
+          items={[
+            {
+              label: "Hapus Owner",
+              value: "",
+              right: () => <List.Icon icon="delete-outline" color="red" />,
+              onPress: () => setConfirmDeleteVisible(true),
+              labelStyle: { color: "red", fontWeight: "500", fontSize: 15 },
+            },
+          ]}
+        />
+
+
       </ScrollView>
+
+       {saving && (
+                      <View style={styles.loadingOverlay}>
+                          <ActivityIndicator size="large" color="#fff" />
+                      </View>
+                  )}
     </View>
   );
 }
 
 /* ================= STYLES ================= */
-
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F4F4F4" },
-  scroll: { flex: 1 },
+    container: { flex: 1, backgroundColor: "#F4F4F4" },
+    scroll: { flex: 1 },
+    loadingOverlay: {
+        position: "absolute",
+        top: 0,
+        bottom: 0,
+        left: 0,
+        right: 0,
+        backgroundColor: "rgba(0,0,0,0.4)",
+        justifyContent: "center",
+        alignItems: "center",
+        zIndex: 999,
+    },
 });
+
