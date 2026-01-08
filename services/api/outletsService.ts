@@ -131,3 +131,21 @@ export const updateOutlet = async (
   const res = await api.put(`/updateOutlet?id=${id}`, payload);
   return res.data;
 };
+
+/* ------------------------------------------
+   SET OUTLET (default / active outlet)
+-------------------------------------------*/
+export interface SetOutletPayload {
+  rootPath: string,
+  basePath: string,
+  outlet_id: string;
+  owner_id: string;
+  role_id?: string;
+}
+
+export const setOutlet = async (
+  payload: SetOutletPayload
+): Promise<OutletResponse> => {
+  const res = await api.post("/setOutlet", payload);
+  return res.data;
+};

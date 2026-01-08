@@ -47,6 +47,8 @@ export function initAuthTokenListener() {
     );
 
     store.setAuthReady(true);
+    //const tokenResult = await user.getIdTokenResult();
+    //console.log("ACTIVE TENANT:", tokenResult.claims.active_tenant);
   };
 
   // 🌐 WEB

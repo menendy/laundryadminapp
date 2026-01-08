@@ -55,6 +55,7 @@ const MENU_JSON: MenuItem[] = [
 
 
       { key: "page_admin", label: "Akses Admin", icon: "account-group-outline", path: "pages_admin" },
+      { key: "page_admin2", label: "Akses Admin2", icon: "account-group-outline", path: "pages_admin2" },
       { key: "page_operational", label: "Akses operasional", icon: "account-group-outline", path: "pages_operational" },
 
 

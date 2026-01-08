@@ -49,11 +49,13 @@ api.interceptors.request.use(
       if (Platform.OS === "web") {
         const user = webAuth.current.currentUser;
         if (user) {
+           // eslint-disable-next-line @typescript-eslint/no-deprecated
           token = await user.getIdToken(true); // 🔥 FORCE REFRESH
         }
       } else {
         const user = getAuth().currentUser;
         if (user) {
+          // eslint-disable-next-line @typescript-eslint/no-deprecated
           token = await user.getIdToken(true);
         }
       }

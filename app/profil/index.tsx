@@ -2,13 +2,14 @@
 import React, { useEffect, useState } from "react";
 import { View, TouchableOpacity, StyleSheet } from "react-native";
 import { Text, Avatar, List } from "react-native-paper";
-import { useRouter, usePathname } from "expo-router";
-import { Platform } from "react-native";
+import { useRouter, useGlobalSearchParams } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { getUserProfile } from "../../services/api/usersService";
 import { handleBackendError } from "../../utils/handleBackendError";
 import { useSnackbarStore } from "../../store/useSnackbarStore";
 import { useAuthStore } from "../../store/useAuthStore";
+import { useBasePath } from "../../utils/useBasePath";
 
 // ✅ SATU-SATUNYA CARA LOGOUT
 import { signOut } from "../../services/firebase";
@@ -18,10 +19,19 @@ interface RightValueProps {
   warning?: boolean;
 }
 
+type ProfileParams = {
+  updatedField?: string;
+  updatedValue?: string;
+};
+
 export default function ProfilAkun() {
   const router = useRouter();
-  const pathname = usePathname();
+  const params = useGlobalSearchParams<ProfileParams>();
   const showSnackbar = useSnackbarStore((s) => s.showSnackbar);
+  const insets = useSafeAreaInsets();
+
+  // 🔥 SAMA DENGAN KARYAWAN
+  const { rootBase: rootPath, basePath } = useBasePath();
 
   const [profile, setProfile] = useState<any>({
     name: "-",
@@ -32,11 +42,13 @@ export default function ProfilAkun() {
     birthday: "",
     photo_url: null,
     outlet_default: null,
+    address: "",
   });
 
-  // ============================
-  // 🔠 UTIL
-  // ============================
+  /* =========================
+     UTIL
+  ========================== */
+
   const getInitials = (fullName: string) =>
     fullName
       ?.trim()
@@ -59,7 +71,10 @@ export default function ProfilAkun() {
     return "*".repeat(len - 2) + phone.slice(len - 2);
   };
 
-  const RightValue: React.FC<RightValueProps> = ({ text, warning = false }) => (
+  const RightValue: React.FC<RightValueProps> = ({
+    text,
+    warning = false,
+  }) => (
     <View style={styles.rightContainer}>
       <Text style={warning ? styles.rightTextWarning : styles.rightText}>
         {text}
@@ -68,9 +83,10 @@ export default function ProfilAkun() {
     </View>
   );
 
-  // ============================
-  // 🔄 LOAD PROFILE
-  // ============================
+  /* =========================
+     LOAD PROFILE (ONCE)
+  ========================== */
+
   useEffect(() => {
     const load = async () => {
       const res = await getUserProfile();
@@ -84,8 +100,46 @@ export default function ProfilAkun() {
         });
       }
     };
+
     load();
   }, []);
+
+  /* =========================
+     REALTIME UPDATE (SAMA POLA KARYAWAN)
+  ========================== */
+
+  useEffect(() => {
+    if (!params.updatedField) return;
+
+    const f = params.updatedField;
+    const v = params.updatedValue ?? "";
+
+    if (f === "name") setProfile((p: any) => ({ ...p, name: v }));
+    if (f === "phone") setProfile((p: any) => ({ ...p, phone: v }));
+    if (f === "email") setProfile((p: any) => ({ ...p, email: v }));
+    if (f === "address") setProfile((p: any) => ({ ...p, address: v }));
+    if (f === "gender") setProfile((p: any) => ({ ...p, gender: v }));
+    if (f === "birthday") setProfile((p: any) => ({ ...p, birthday: v }));
+
+    if (f === "outlet_default") {
+      try {
+        const outlet = JSON.parse(v);
+        setProfile((p: any) => ({ ...p, outlet_default: outlet }));
+      } catch {
+        console.warn("Invalid outlet_default param");
+      }
+    }
+
+    // reset agar tidak trigger ulang
+    router.setParams({
+      updatedField: undefined,
+      updatedValue: undefined,
+    });
+  }, [params.updatedField, params.updatedValue]);
+
+  /* =========================
+     UI
+  ========================== */
 
   return (
     <View style={styles.container}>
@@ -104,7 +158,7 @@ export default function ProfilAkun() {
       {/* ================= OUTLET ================= */}
       <View style={styles.sectionCard}>
         <List.Item
-          title="Outlet"
+          title="Outlet Aktif"
           right={() => (
             <RightValue
               text={profile.outlet_default?.name || "Atur Sekarang"}
@@ -124,9 +178,12 @@ export default function ProfilAkun() {
             router.push({
               pathname: "/profil/modal/[field]",
               params: {
+                id: profile.uid,
                 field: "name",
                 label: "Nama",
                 value: profile.name,
+                rootPath,
+                basePath,
               },
             })
           }
@@ -136,7 +193,9 @@ export default function ProfilAkun() {
 
         <List.Item
           title="Alamat"
-          right={() => <RightValue text={profile.address || "Atur Sekarang"} />}
+          right={() => (
+            <RightValue text={profile.address || "Atur Sekarang"} />
+          )}
           onPress={() =>
             router.push({
               pathname: "/profil/modal/[field]",
@@ -144,6 +203,8 @@ export default function ProfilAkun() {
                 field: "address",
                 label: "Alamat",
                 value: profile.address,
+                rootPath,
+                basePath,
               },
             })
           }
@@ -154,7 +215,9 @@ export default function ProfilAkun() {
       <View style={styles.sectionCard}>
         <List.Item
           title="Jenis Kelamin"
-          right={() => <RightValue text={profile.gender || "Atur Sekarang"} />}
+          right={() => (
+            <RightValue text={profile.gender || "Atur Sekarang"} />
+          )}
           onPress={() =>
             router.push({
               pathname: "/profil/modal/[field]",
@@ -162,6 +225,8 @@ export default function ProfilAkun() {
                 field: "gender",
                 label: "Jenis Kelamin",
                 value: profile.gender,
+                rootPath,
+                basePath,
               },
             })
           }
@@ -171,7 +236,9 @@ export default function ProfilAkun() {
 
         <List.Item
           title="Tanggal Lahir"
-          right={() => <RightValue text={profile.birthday || "Atur Sekarang"} />}
+          right={() => (
+            <RightValue text={profile.birthday || "Atur Sekarang"} />
+          )}
           onPress={() =>
             router.push({
               pathname: "/profil/modal/[field]",
@@ -179,6 +246,8 @@ export default function ProfilAkun() {
                 field: "birthday",
                 label: "Tanggal Lahir",
                 value: profile.birthday,
+                rootPath,
+                basePath,
               },
             })
           }
@@ -190,7 +259,9 @@ export default function ProfilAkun() {
         <List.Item
           title="No. Handphone"
           right={() => (
-            <RightValue text={maskPhone(profile.phone) || "Atur Sekarang"} />
+            <RightValue
+              text={maskPhone(profile.phone) || "Atur Sekarang"}
+            />
           )}
           onPress={() =>
             router.push({
@@ -199,6 +270,8 @@ export default function ProfilAkun() {
                 field: "phone",
                 label: "No. Handphone",
                 value: profile.phone,
+                rootPath,
+                basePath,
               },
             })
           }
@@ -209,7 +282,9 @@ export default function ProfilAkun() {
         <List.Item
           title="Email"
           right={() => (
-            <RightValue text={maskEmail(profile.email) || "Atur Sekarang"} />
+            <RightValue
+              text={maskEmail(profile.email) || "Atur Sekarang"}
+            />
           )}
           onPress={() =>
             router.push({
@@ -218,6 +293,8 @@ export default function ProfilAkun() {
                 field: "email",
                 label: "Email",
                 value: profile.email,
+                rootPath,
+                basePath,
               },
             })
           }
@@ -230,11 +307,10 @@ export default function ProfilAkun() {
         left={() => <List.Icon icon="logout" />}
         onPress={async () => {
           try {
-            await signOut(); // ✅ WEB + MOBILE, TANPA WARNING
+            await signOut();
           } catch (err) {
             console.warn("Logout error (ignored):", err);
           } finally {
-            // fallback (auth listener juga akan jalan)
             useAuthStore.getState().logout();
             router.replace("/auth/login");
           }
@@ -243,6 +319,8 @@ export default function ProfilAkun() {
     </View>
   );
 }
+
+/* ================= STYLES ================= */
 
 const styles = StyleSheet.create({
   container: {
