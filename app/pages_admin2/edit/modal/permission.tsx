@@ -13,9 +13,32 @@ export default function EditPermissionModal() {
   const [permission, setPermission] = useState(params.permission || "");
   const [url, setUrl] = useState(params.url || "");
 
+  // 1. Tambahkan state untuk menampung error
+  const [errors, setErrors] = useState<{ permission?: string; url?: string }>({});
+
   const close = () => router.back();
 
   const handleSave = () => {
+    // 2. Logika Validasi
+    let isValid = true;
+    const newErrors: { permission?: string; url?: string } = {};
+
+    if (!permission.trim()) {
+      newErrors.permission = "Permission wajib diisi";
+      isValid = false;
+    }
+
+    if (!url.trim()) {
+      newErrors.url = "URL wajib diisi";
+      isValid = false;
+    }
+
+    if (!isValid) {
+      setErrors(newErrors);
+      return;
+    }
+
+    // Jika valid, lanjutkan simpan params
     router.setParams({
       updatedType: "permission",
       updatedId: params.id,
@@ -23,6 +46,7 @@ export default function EditPermissionModal() {
       updatedPermission: permission,
       updatedUrl: url,
     });
+
     close();
   };
 
@@ -36,13 +60,26 @@ export default function EditPermissionModal() {
 
         <ValidatedInput
           label="Permission"
+          required
           value={permission}
-          onChangeText={setPermission}
+          onChangeText={(text) => {
+            setPermission(text);
+            // Hapus error saat user mengetik
+            if (errors.permission) setErrors((prev) => ({ ...prev, permission: undefined }));
+          }}
+          error={errors.permission}
         />
+
         <ValidatedInput
           label="URL"
+          required
           value={url}
-          onChangeText={setUrl}
+          onChangeText={(text) => {
+            setUrl(text);
+            // Hapus error saat user mengetik
+            if (errors.url) setErrors((prev) => ({ ...prev, url: undefined }));
+          }}
+          error={errors.url}
         />
 
         <Button mode="contained" onPress={handleSave}>

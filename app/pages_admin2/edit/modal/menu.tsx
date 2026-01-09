@@ -1,45 +1,81 @@
 import React, { useState } from "react";
-import { View } from "react-native";
-import Modal from "react-native-modal";
-import { Button, IconButton, Text } from "react-native-paper";
+import { View, Text, Pressable } from "react-native";
+import { Card } from "react-native-paper";
 import { useRouter, useLocalSearchParams } from "expo-router";
-import { SafeAreaView } from "react-native-safe-area-context";
 import ValidatedInput from "../../../../components/ui/ValidatedInput";
 
 export default function EditMenuModal() {
   const router = useRouter();
-  const { id, name } = useLocalSearchParams<any>();
-  const [value, setValue] = useState(name || "");
+  const params = useLocalSearchParams<any>();
+
+  // ✅ FIX: Ambil nilai awal dari params (data yang dikirim dari Tree)
+  const [name, setName] = useState(params.name || "");
+
+  const [errors, setErrors] = useState<{ name?: string }>({});
 
   const close = () => router.back();
 
   const handleSave = () => {
+    if (!name.trim()) {
+      setErrors({ name: "Nama menu wajib diisi" });
+      return;
+    }
+
+    // ✅ FIX: Gunakan setParams untuk memicu update di state.ts
+    // Jangan gunakan addDraft di sini
     router.setParams({
       updatedType: "menu",
-      updatedId: id,
-      updatedValue: value.trim(),
+      updatedId: params.id,
+      updatedValue: name.trim(),
     });
+
     close();
   };
 
   return (
-    <Modal isVisible style={{ justifyContent: "flex-end", margin: 0 }}>
-      <SafeAreaView style={{ backgroundColor: "#fff", padding: 18 }}>
-        <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-          <Text style={{ fontWeight: "700" }}>Edit Menu</Text>
-          <IconButton icon="close" onPress={close} />
+    <View
+      style={{
+        flex: 1,
+        justifyContent: "center",
+        padding: 20,
+        backgroundColor: "rgba(0,0,0,0.4)",
+      }}
+    >
+      <Card style={{ padding: 20, borderRadius: 16, backgroundColor: "#fff" }}>
+        <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 16 }}>
+          {/* ✅ FIX: Judul jadi Edit */}
+          <Text style={{ fontSize: 18, fontWeight: "700" }}>Edit Menu</Text>
         </View>
 
         <ValidatedInput
           label="Nama Menu"
-          value={value}
-          onChangeText={setValue}
+          required
+          value={name}
+          onChangeText={(text) => {
+            setName(text);
+            if (errors.name) setErrors({});
+          }}
+          error={errors.name}
         />
 
-        <Button mode="contained" onPress={handleSave}>
-          Simpan
-        </Button>
-      </SafeAreaView>
-    </Modal>
+        <View style={{ flexDirection: "row", justifyContent: "flex-end", marginTop: 10 }}>
+          <Pressable onPress={close} style={{ marginRight: 16, padding: 10 }}>
+            <Text>Batal</Text>
+          </Pressable>
+
+          <Pressable
+            onPress={handleSave}
+            style={{
+              backgroundColor: "#2563eb",
+              paddingHorizontal: 18,
+              paddingVertical: 10,
+              borderRadius: 8,
+            }}
+          >
+            <Text style={{ color: "#fff", fontWeight: "600" }}>Simpan</Text>
+          </Pressable>
+        </View>
+      </Card>
+    </View>
   );
 }

@@ -1,13 +1,15 @@
 import React, { useState } from "react";
 import { View, Text, Pressable } from "react-native";
 import { Card } from "react-native-paper";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 
 import { usePagesAdminDraftStore } from "../../../../store/usePagesAdminDraftStore.web";
 import ValidatedInput from "../../../../components/ui/ValidatedInput";
 
 export default function AddMenuModal() {
   const router = useRouter();
+  const params = useLocalSearchParams<any>();
+  
   const addDraft = usePagesAdminDraftStore((s) => s.addDraft);
 
   const [name, setName] = useState("");
@@ -16,6 +18,10 @@ export default function AddMenuModal() {
   const [errors, setErrors] = useState<{
     name?: string;
   }>({});
+
+  // ✅ TERIMA SORT YANG SUDAH DIHITUNG DARI PARENT
+  const incomingSort = params.sort ? Number(params.sort) : 9999;
+  const parentId = params.parent_id || null;
 
   const handleSubmit = () => {
     if (!name.trim()) {
@@ -28,8 +34,8 @@ export default function AddMenuModal() {
       type: "menu",
       name: name.trim(),
       path: path.trim() || null,
-      parent_id: null,
-      sort: 9999,
+      parent_id: parentId,
+      sort: incomingSort, // ✅ GUNAKAN SORT DARI PARAMS
       level: 0,
     } as any);
 
@@ -50,7 +56,6 @@ export default function AddMenuModal() {
           Tambah Menu
         </Text>
 
-        {/* === HANYA GANTI INPUT === */}
         <ValidatedInput
           label="Nama Menu"
           required
@@ -62,9 +67,6 @@ export default function AddMenuModal() {
           }}
           error={errors.name}
         />
-
-        
-        {/* === END INPUT === */}
 
         <View style={{ flexDirection: "row", justifyContent: "flex-end" }}>
           <Pressable onPress={() => router.back()} style={{ marginRight: 16 }}>

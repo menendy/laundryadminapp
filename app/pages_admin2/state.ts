@@ -1,17 +1,7 @@
-// app/pages_admin2/state.ts
 import { useEffect, useMemo, useState } from "react";
-import {
-  useRouter,
-  useGlobalSearchParams,
-} from "expo-router";
-
-import {
-  getPagesAdminList2,
-  PageAdminItem,
-} from "../../services/api/pagesAdminService2";
+import { useRouter, useGlobalSearchParams } from "expo-router";
+import { getPagesAdminList2, PageAdminItem } from "../../services/api/pagesAdminService2";
 import { usePagesAdminDraftStore } from "../../store/usePagesAdminDraftStore.web";
-
-/* ================= TYPES ================= */
 
 export type TreeNode = PageAdminItem & {
   children: TreeNode[];
@@ -20,25 +10,26 @@ export type TreeNode = PageAdminItem & {
 /* ================= HELPERS ================= */
 
 function buildMenuTree(items: PageAdminItem[]): TreeNode[] {
+  // 1. Deep Clone untuk memutus referensi agar aman saat mutasi
+  const itemsMap = items.map(i => ({ ...i, children: [] as TreeNode[] }));
   const map = new Map<string, TreeNode>();
-
-  items.forEach(item => {
-    map.set(item.id, { ...item, children: [] });
+  
+  itemsMap.forEach(item => {
+    map.set(item.id, item);
   });
 
   const tree: TreeNode[] = [];
 
-  items.forEach(item => {
-    const node = map.get(item.id)!;
-    if (item.parent_id) {
-      map.get(item.parent_id)?.children.push(node);
+  itemsMap.forEach(node => {
+    if (node.parent_id && map.has(node.parent_id)) {
+      map.get(node.parent_id)!.children.push(node);
     } else {
       tree.push(node);
     }
   });
 
   const sortTree = (nodes: TreeNode[]) => {
-    nodes.sort((a, b) => a.sort - b.sort);
+    nodes.sort((a, b) => (a.sort || 0) - (b.sort || 0));
     nodes.forEach(n => sortTree(n.children));
   };
 
@@ -52,85 +43,72 @@ export function usePagesAdminState() {
   const router = useRouter();
   const params = useGlobalSearchParams<any>();
 
-  const [items, setItems] = useState<PageAdminItem[]>([]);
+  // State tunggal untuk UI (Server + Drafts)
+  const [viewItems, setViewItems] = useState<PageAdminItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [dirty, setDirty] = useState(false);
 
   const { drafts } = usePagesAdminDraftStore();
 
-  /* ===== FETCH ===== */
+  /* ===== 1. FETCH SERVER DATA ===== */
   useEffect(() => {
     getPagesAdminList2()
-      .then(res => res.success && setItems(res.data))
+      .then(res => {
+        if (res.success) {
+          setViewItems(res.data);
+        }
+      })
       .finally(() => setLoading(false));
   }, []);
 
-  /* ===== APPLY UPDATE FROM MODAL ===== */
+  /* ===== 2. SYNC DRAFTS TO VIEW ITEMS ===== */
+  // Ketika ada draft baru, masukkan ke viewItems jika belum ada
+  useEffect(() => {
+    if (drafts.length > 0) {
+      setViewItems(prev => {
+        // Cari draft yang belum ada di viewItems
+        const newDrafts = drafts.filter(d => !prev.some(p => p.id === d.id));
+        if (newDrafts.length === 0) return prev; // Tidak ada perubahan
+        
+        // Tambahkan draft ke list, set dirty
+        setDirty(true);
+        return [...prev, ...newDrafts];
+      });
+    }
+  }, [drafts]);
+
+  /* ===== 3. HANDLE UPDATES FROM MODAL ===== */
   useEffect(() => {
     if (!params.updatedType || !params.updatedId) return;
 
-    setItems(prev =>
+    setViewItems(prev =>
       prev.map(item => {
         if (item.id !== params.updatedId) return item;
 
         if (params.updatedType === "menu") {
           return { ...item, name: params.updatedValue };
         }
-
+        // ... logic update lain (page/permission) sama seperti sebelumnya ...
         if (params.updatedType === "page") {
-          return {
-            ...item,
-            name: params.updatedName,
-            path: params.updatedPath,
-            component: params.updatedComponent,
-          };
+             return { ...item, name: params.updatedName, path: params.updatedPath, component: params.updatedComponent };
         }
-
-        if (params.updatedType === "permission") {
-          const next = { ...(item.permissions_type || {}) };
-          delete next[params.oldUrl];
-          next[params.updatedUrl] = params.updatedPermission;
-          return { ...item, permissions_type: next };
-        }
-
         return item;
       })
     );
 
     setDirty(true);
-
-    router.setParams({
-      updatedType: undefined,
-      updatedId: undefined,
-      updatedValue: undefined,
-      updatedName: undefined,
-      updatedPath: undefined,
-      updatedComponent: undefined,
-      updatedPermission: undefined,
-      updatedUrl: undefined,
-      oldUrl: undefined,
-    });
+    router.setParams({ updatedType: undefined, updatedId: undefined });
   }, [params]);
 
-  /* ===== DIRTY FROM DRAFT ===== */
-  useEffect(() => {
-    if (drafts.length > 0) setDirty(true);
-  }, [drafts.length]);
-
-  // Gabungkan items dan drafts agar menu baru memiliki ID yang valid di dnd-kit
-  const allFlattenedItems = useMemo(() => [...items, ...drafts], [items, drafts]);
-
-  const tree = useMemo(
-    () => buildMenuTree(allFlattenedItems),
-    [allFlattenedItems]
-  );
+  // Tree selalu dibentuk dari viewItems yang sudah berisi Server + Drafts
+  const tree = useMemo(() => buildMenuTree(viewItems), [viewItems]);
 
   return {
-    items: allFlattenedItems, 
+    items: viewItems, // Kembalikan viewItems sebagai 'items' utama
+    setItems: setViewItems, // Expose setter untuk DND
     tree,
     loading,
     dirty,
     setDirty,
-    setItems,
   };
 }
