@@ -5,21 +5,21 @@ import { Button, IconButton, Text } from "react-native-paper";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import ValidatedInput from "../../../../components/ui/ValidatedInput";
+import { usePagesAdminDraftStore } from "../../../../store/usePagesAdminDraftStore.web";
 
 export default function EditPermissionModal() {
   const router = useRouter();
   const params = useLocalSearchParams<any>();
+  
+  const setUpdateSignal = usePagesAdminDraftStore((s) => s.setUpdateSignal);
 
   const [permission, setPermission] = useState(params.permission || "");
   const [url, setUrl] = useState(params.url || "");
-
-  // 1. Tambahkan state untuk menampung error
   const [errors, setErrors] = useState<{ permission?: string; url?: string }>({});
 
   const close = () => router.back();
 
   const handleSave = () => {
-    // 2. Logika Validasi
     let isValid = true;
     const newErrors: { permission?: string; url?: string } = {};
 
@@ -27,7 +27,6 @@ export default function EditPermissionModal() {
       newErrors.permission = "Permission wajib diisi";
       isValid = false;
     }
-
     if (!url.trim()) {
       newErrors.url = "URL wajib diisi";
       isValid = false;
@@ -38,8 +37,8 @@ export default function EditPermissionModal() {
       return;
     }
 
-    // Jika valid, lanjutkan simpan params
-    router.setParams({
+    // ✅ KIRIM SIGNAL KE STORE
+    setUpdateSignal({
       updatedType: "permission",
       updatedId: params.id,
       oldUrl: params.oldUrl,
@@ -64,7 +63,6 @@ export default function EditPermissionModal() {
           value={permission}
           onChangeText={(text) => {
             setPermission(text);
-            // Hapus error saat user mengetik
             if (errors.permission) setErrors((prev) => ({ ...prev, permission: undefined }));
           }}
           error={errors.permission}
@@ -76,7 +74,6 @@ export default function EditPermissionModal() {
           value={url}
           onChangeText={(text) => {
             setUrl(text);
-            // Hapus error saat user mengetik
             if (errors.url) setErrors((prev) => ({ ...prev, url: undefined }));
           }}
           error={errors.url}

@@ -22,6 +22,7 @@ export interface PageAdminItem {
 
   permissions_type?: { [key: string]: string };
   useRole?: boolean;
+  icon?: string;
 }
 
 export interface PagesAdminList2Response {

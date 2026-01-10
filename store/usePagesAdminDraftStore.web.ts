@@ -7,41 +7,37 @@ interface DraftState {
   drafts: PageAdminItem[];
   isHydrated: boolean;
 
-  // EXISTING
   addDraft: (item: PageAdminItem) => void;
   clearDrafts: () => void;
   hydrate: () => void;
-
-  // ✅ BARU (TAMBAH PERMISSION KE PAGE)
   addPermissionDraft: (
     pageId: string,
     permission: { url: string; permission: string }
   ) => void;
+
+  // ✅ BARU: Signal untuk Edit Data
+  updateSignal: any | null;
+  setUpdateSignal: (signal: any) => void;
 }
 
 export const usePagesAdminDraftStore = create<DraftState>((set, get) => ({
   drafts: [],
   isHydrated: false,
+  
+  // ✅ Initial State Signal
+  updateSignal: null,
 
-  // =========================
-  // ADD NEW ITEM ONLY
-  // =========================
   addDraft: (item) => {
     const next = [...get().drafts, item];
     set({ drafts: next });
-
     try {
       localStorage.setItem(DRAFT_KEY, JSON.stringify(next));
     } catch {}
   },
 
-  // =========================
-  // ADD PERMISSION TO PAGE
-  // =========================
   addPermissionDraft: (pageId, permission) => {
     const next = get().drafts.map(draft => {
       if (draft.id !== pageId) return draft;
-
       return {
         ...draft,
         permissions_type: {
@@ -50,17 +46,12 @@ export const usePagesAdminDraftStore = create<DraftState>((set, get) => ({
         },
       };
     });
-
     set({ drafts: next });
-
     try {
       localStorage.setItem(DRAFT_KEY, JSON.stringify(next));
     } catch {}
   },
 
-  // =========================
-  // CLEAR (ON REFRESH / SAVE)
-  // =========================
   clearDrafts: () => {
     set({ drafts: [] });
     try {
@@ -68,12 +59,8 @@ export const usePagesAdminDraftStore = create<DraftState>((set, get) => ({
     } catch {}
   },
 
-  // =========================
-  // HYDRATE (OPTIONAL)
-  // =========================
   hydrate: () => {
     if (get().isHydrated) return;
-
     try {
       const raw = localStorage.getItem(DRAFT_KEY);
       set({
@@ -84,4 +71,7 @@ export const usePagesAdminDraftStore = create<DraftState>((set, get) => ({
       set({ isHydrated: true });
     }
   },
+
+  // ✅ BARU: Setter Signal
+  setUpdateSignal: (signal) => set({ updateSignal: signal }),
 }));

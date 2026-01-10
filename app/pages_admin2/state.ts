@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useRouter, useGlobalSearchParams } from "expo-router";
+import { useRouter } from "expo-router";
 import { getPagesAdminList2, PageAdminItem } from "../../services/api/pagesAdminService2";
 import { usePagesAdminDraftStore } from "../../store/usePagesAdminDraftStore.web";
 
@@ -10,7 +10,6 @@ export type TreeNode = PageAdminItem & {
 /* ================= HELPERS ================= */
 
 function buildMenuTree(items: PageAdminItem[]): TreeNode[] {
-  // 1. Deep Clone untuk memutus referensi agar aman saat mutasi
   const itemsMap = items.map(i => ({ ...i, children: [] as TreeNode[] }));
   const map = new Map<string, TreeNode>();
   
@@ -41,14 +40,12 @@ function buildMenuTree(items: PageAdminItem[]): TreeNode[] {
 
 export function usePagesAdminState() {
   const router = useRouter();
-  const params = useGlobalSearchParams<any>();
 
-  // State tunggal untuk UI (Server + Drafts)
   const [viewItems, setViewItems] = useState<PageAdminItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [dirty, setDirty] = useState(false);
 
-  const { drafts } = usePagesAdminDraftStore();
+  const { drafts, updateSignal, setUpdateSignal } = usePagesAdminDraftStore();
 
   /* ===== 1. FETCH SERVER DATA ===== */
   useEffect(() => {
@@ -62,53 +59,88 @@ export function usePagesAdminState() {
   }, []);
 
   /* ===== 2. SYNC DRAFTS TO VIEW ITEMS ===== */
-  // Ketika ada draft baru, masukkan ke viewItems jika belum ada
   useEffect(() => {
     if (drafts.length > 0) {
       setViewItems(prev => {
-        // Cari draft yang belum ada di viewItems
         const newDrafts = drafts.filter(d => !prev.some(p => p.id === d.id));
-        if (newDrafts.length === 0) return prev; // Tidak ada perubahan
-        
-        // Tambahkan draft ke list, set dirty
+        if (newDrafts.length === 0) return prev; 
         setDirty(true);
         return [...prev, ...newDrafts];
       });
     }
   }, [drafts]);
 
-  /* ===== 3. HANDLE UPDATES FROM MODAL ===== */
+  /* ===== 3. HANDLE UPDATES (VIA STORE SIGNAL) ===== */
   useEffect(() => {
-    if (!params.updatedType || !params.updatedId) return;
+    if (!updateSignal) return;
 
-    setViewItems(prev =>
-      prev.map(item => {
-        if (item.id !== params.updatedId) return item;
+    setViewItems(prev => {
+        // 🔴 KASUS 1: HAPUS ITEM (MENU/PAGE) & ANAKNYA
+        if (updateSignal.updatedType === "delete_item") {
+            const getIdsToDelete = (parentId: string, allItems: PageAdminItem[]): string[] => {
+                let ids = [parentId];
+                const children = allItems.filter(i => i.parent_id === parentId);
+                children.forEach(child => {
+                    ids = [...ids, ...getIdsToDelete(child.id, allItems)];
+                });
+                return ids;
+            };
 
-        if (params.updatedType === "menu") {
-          return { ...item, name: params.updatedValue };
+            const idsToDelete = getIdsToDelete(updateSignal.updatedId, prev);
+            return prev.filter(item => !idsToDelete.includes(item.id));
         }
-        // ... logic update lain (page/permission) sama seperti sebelumnya ...
-        if (params.updatedType === "page") {
-             return { ...item, name: params.updatedName, path: params.updatedPath, component: params.updatedComponent };
+
+        // 🔴 KASUS 2: HAPUS PERMISSION
+        if (updateSignal.updatedType === "delete_permission") {
+            return prev.map(item => {
+                if (item.id !== updateSignal.updatedId) return item;
+                const nextPermissions = { ...(item.permissions_type || {}) };
+                delete nextPermissions[updateSignal.updatedUrl];
+                return { ...item, permissions_type: nextPermissions };
+            });
         }
-        return item;
-      })
-    );
+
+        // 🔵 KASUS 3: EDIT EXISTING (Menu/Page/Permission Add/Edit)
+        return prev.map(item => {
+            if (item.id !== updateSignal.updatedId) return item;
+
+            if (updateSignal.updatedType === "menu") {
+                return { 
+                    ...item, 
+                    name: updateSignal.updatedValue,
+                    // ✅ UPDATE ICON JIKA ADA PERUBAHAN
+                    icon: updateSignal.updatedIcon || item.icon 
+                };
+            }
+            
+            if (updateSignal.updatedType === "page") {
+                return { 
+                    ...item, 
+                    name: updateSignal.updatedName, 
+                    icon: updateSignal.updatedIcon || item.icon,
+                    path: updateSignal.updatedPath, 
+                    component: updateSignal.updatedComponent 
+                };
+            }
+
+            if (updateSignal.updatedType === "permission") {
+                const nextPermissions = { ...(item.permissions_type || {}) };
+                if (updateSignal.oldUrl && updateSignal.oldUrl !== updateSignal.updatedUrl) {
+                    delete nextPermissions[updateSignal.oldUrl];
+                }
+                nextPermissions[updateSignal.updatedUrl] = updateSignal.updatedPermission;
+                return { ...item, permissions_type: nextPermissions };
+            }
+
+            return item;
+        });
+    });
 
     setDirty(true);
-    router.setParams({ updatedType: undefined, updatedId: undefined });
-  }, [params]);
+    setUpdateSignal(null); 
+  }, [updateSignal]);
 
-  // Tree selalu dibentuk dari viewItems yang sudah berisi Server + Drafts
   const tree = useMemo(() => buildMenuTree(viewItems), [viewItems]);
 
-  return {
-    items: viewItems, // Kembalikan viewItems sebagai 'items' utama
-    setItems: setViewItems, // Expose setter untuk DND
-    tree,
-    loading,
-    dirty,
-    setDirty,
-  };
+  return { items: viewItems, setItems: setViewItems, tree, loading, dirty, setDirty };
 }
