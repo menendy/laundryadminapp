@@ -37,7 +37,7 @@ export default function AddMenuModal() {
       parent_id: parentId,
       sort: incomingSort,
       level: 0,
-      is_expandable: true,
+     
       active: true,
       can_view_by: [],
       permissions_type: {},

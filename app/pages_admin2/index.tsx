@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { View, ScrollView, Text, Pressable } from "react-native";
+// ✅ 1. Pastikan import Platform dan useWindowDimensions ada
+import { View, ScrollView, Text, Pressable, Platform, useWindowDimensions } from "react-native";
 import { ActivityIndicator, Portal, Dialog, Button, Text as PaperText } from "react-native-paper";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { 
@@ -21,15 +22,76 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 
 import AppHeaderList from "../../components/ui/AppHeaderList";
-import { TreeItem } from "./tree";
-import { usePagesAdminState } from "./state";
+import { TreeItem } from "../../components/pages_admin2/tree";
+import { usePagesAdminState } from "../../components/pages_admin2/state";
 import { usePagesAdminDraftStore } from "../../store/usePagesAdminDraftStore.web";
+
+import { savePagesAdminStructure } from "../../services/api/pagesAdminService2";
+import { handleBackendError } from "../../utils/handleBackendError";
+import { useSnackbarStore } from "../../store/useSnackbarStore";
 
 export default function PagesAdmin2() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const showSnackbar = useSnackbarStore((s) => s.showSnackbar);
   
+  // ✅ 2. DETEKSI PLATFORM & UKURAN LAYAR
+  const { width } = useWindowDimensions();
+  
+  // Deteksi jika aplikasi berjalan di Android atau iOS (Native)
+  const isNativeApp = Platform.OS === 'ios' || Platform.OS === 'android';
+
+  // Deteksi jika browser web tapi layarnya kecil (Mobile Web)
+  const isSmallWeb = Platform.OS === 'web' && width < 768; 
+
+  // ✅ 3. LOGIKA BLOCKER (EARLY RETURN)
+  // Jika ini Native App ATAU Web Layar Kecil, TAMPILKAN INFO & STOP RENDER DndContext
+  if (isNativeApp || isSmallWeb) {
+     return (
+        <View style={{ flex: 1, backgroundColor: "#f8fafc", justifyContent: "center", alignItems: "center", padding: 20 }}>
+            <View style={{ 
+                backgroundColor: "white", 
+                padding: 30, 
+                borderRadius: 20, 
+                alignItems: "center", 
+                elevation: 4, // Shadow android
+                shadowColor: "#000", // Shadow iOS
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.1,
+                shadowRadius: 4,
+                maxWidth: 400,
+                width: '100%'
+            }}>
+                <MaterialCommunityIcons name="monitor-screenshot" size={64} color="#cbd5e1" style={{ marginBottom: 20 }} />
+                
+                <Text style={{ fontSize: 18, fontWeight: "700", color: "#1e293b", textAlign: "center", marginBottom: 10 }}>
+                    Hanya Tersedia di Desktop
+                </Text>
+                
+                <Text style={{ fontSize: 14, color: "#64748b", textAlign: "center", lineHeight: 22, marginBottom: 24 }}>
+                 Mohon akses halaman ini melalui Laptop atau PC menggunakan Web Browser untuk pengalaman terbaik.
+                </Text>
+
+                <Button 
+                    mode="contained" 
+                    onPress={() => router.back()} 
+                    buttonColor="#2563eb"
+                    style={{ borderRadius: 8, width: "100%" }}
+                >
+                    Kembali
+                </Button>
+            </View>
+        </View>
+     );
+  }
+
+  // =====================================================================
+  // KODE DI BAWAH INI HANYA AKAN DIJALANKAN DI WEB DESKTOP
+  // (Sehingga error getBoundingClientRect tidak akan muncul di HP)
+  // =====================================================================
+
   const [openAddDialog, setOpenAddDialog] = useState(false);
+  const [submitLoading, setSubmitLoading] = useState(false);
 
   const { items, tree, loading, dirty, setDirty, setItems } = usePagesAdminState();
   const { setUpdateSignal } = usePagesAdminDraftStore();
@@ -69,31 +131,21 @@ export default function PagesAdmin2() {
         const overHeight = over.rect.height;
         const overBottom = overTop + overHeight;
         
-        // Konstanta Tinggi Header Kartu (Estimasi Visual)
         const HEADER_HEIGHT = 60; 
 
-        // 1. Deteksi Top Edge (Insert Above) - Fixed 15px
         const isTopEdge = activeCenterY < (overTop + 15);
-
-        // 2. Deteksi Bottom Edge (Insert Below)
-        // Jika Item Tinggi (Expanded), maka semua area DI BAWAH Header adalah "Bottom Edge"
         let isBottomEdge = false;
         
         if (overHeight > HEADER_HEIGHT * 1.5) {
-            // Kasus Expanded: Jika kursor di bawah Header -> Anggap Bottom (Keluar/Sibling)
             isBottomEdge = activeCenterY > (overTop + HEADER_HEIGHT);
         } else {
-            // Kasus Collapsed: Cek 15px dari bawah
             isBottomEdge = activeCenterY > (overBottom - 15);
         }
 
-        // 3. Logic Nesting (Hanya jika Target MENU dan Kursor di Zona Header)
         if (overItem.type === "menu") {
             if (!isTopEdge && !isBottomEdge) {
-                targetParentId = overItem.id; // Masuk Folder
+                targetParentId = overItem.id;
             }
-            // Jika isBottomEdge = true pada menu expanded, dia akan skip blok ini
-            // dan targetParentId tetap overItem.parent_id (Sibling/Keluar)
         }
       }
       /* -------------------------------------- */
@@ -118,13 +170,38 @@ export default function PagesAdmin2() {
     });
   };
 
-  const handleSubmit = () => {
-    console.log("🚀 DATA SIAP DIKIRIM KE API:", JSON.stringify(items, null, 2));
-    setDirty(false);
+  const handleSubmit = async () => {
+    setSubmitLoading(true);
+
+    try {
+      console.log("🚀 Menyimpan data struktur...");
+      
+      const cleanItems = items.map(item => {
+        const { children, ...rest } = item; 
+        if (rest.type === 'menu') { delete rest.permissions_type; delete rest.component; }
+        if (rest.type === 'page' && !rest.permissions_type) { rest.permissions_type = {}; }
+        return rest;
+      });
+
+      const result = await savePagesAdminStructure(cleanItems);
+
+      const ok = handleBackendError(result, null, showSnackbar);
+      
+      if (ok) {
+        showSnackbar("Struktur berhasil disimpan!", "success");
+        setDirty(false);
+      }
+
+    } catch (err: any) {
+      console.error("🔥 Error saving structure:", err);
+      handleBackendError(err, null, showSnackbar);
+    } finally {
+      setSubmitLoading(false);
+    }
   };
 
   const getNextRootSort = () => {
-    const rootItems = items.filter(i => !i.parent_id); 
+    const rootItems = items.filter(i => !i.parent_id);
     if (rootItems.length === 0) return 1;
     const maxSort = Math.max(...rootItems.map(i => Number(i.sort || 0)));
     return maxSort + 1;
@@ -169,85 +246,94 @@ export default function PagesAdmin2() {
         <View style={{ position: "absolute", bottom: insets.bottom + 72, right: 20 }}>
           <Pressable
             onPress={handleSubmit}
+            disabled={submitLoading}
             style={{
-              backgroundColor: "#2563eb",
+              backgroundColor: submitLoading ? "#93c5fd" : "#2563eb",
               paddingHorizontal: 22,
               paddingVertical: 14,
               borderRadius: 28,
               flexDirection: "row",
-              elevation: 4
+              elevation: 4,
+              alignItems: "center"
             }}
           >
-            <MaterialCommunityIcons name="content-save" size={20} color="#fff" />
-            <Text style={{ color: "#fff", marginLeft: 8, fontWeight: "700" }}>Simpan Struktur</Text>
+            {submitLoading ? (
+               <ActivityIndicator size="small" color="#fff" style={{ marginRight: 8 }} />
+            ) : (
+               <MaterialCommunityIcons name="content-save" size={20} color="#fff" />
+            )}
+            
+            <Text style={{ color: "#fff", marginLeft: submitLoading ? 0 : 8, fontWeight: "700" }}>
+                {submitLoading ? "Menyimpan..." : "Simpan Struktur"}
+            </Text>
           </Pressable>
         </View>
       )}
 
       <Portal>
-  <Dialog
-    visible={openAddDialog}
-    onDismiss={() => setOpenAddDialog(false)}
-    style={{ backgroundColor: 'white', width: 380, alignSelf: 'center', borderRadius: 20}}
-  >
-    <Dialog.Title style={{ color: '#0f172a', textAlign: 'center', fontWeight: 'bold' }}>
-      Tambah Struktur
-    </Dialog.Title>
+        <Dialog
+            visible={openAddDialog}
+            onDismiss={() => setOpenAddDialog(false)}
+            style={{ backgroundColor: 'white', width: 380, alignSelf: 'center', borderRadius: 20}}
+        >
+            <Dialog.Title style={{ color: '#0f172a', textAlign: 'center', fontWeight: 'bold' }}>
+            Tambah Struktur
+            </Dialog.Title>
 
-    <Dialog.Content>
-      <PaperText
-        variant="bodyMedium"
-        style={{ color: '#64748b', textAlign: 'center', marginBottom: 10 }}
-      >
-        Silakan pilih jenis struktur baru yang ingin Anda tambahkan di tingkat utama.
-      </PaperText>
-    </Dialog.Content>
+            <Dialog.Content>
+            <PaperText
+                variant="bodyMedium"
+                style={{ color: '#64748b', textAlign: 'center', marginBottom: 10 }}
+            >
+                Silakan pilih jenis struktur baru yang ingin Anda tambahkan di tingkat utama.
+            </PaperText>
+            </Dialog.Content>
 
-    <Dialog.Actions
-      style={{ flexDirection: 'column', justifyContent: 'center', paddingBottom: 20, paddingHorizontal: 20, }}
-    >
-      <Button
-        mode="contained"
-        onPress={() => {
-          const nextSort = getNextRootSort();
-          setOpenAddDialog(false);
-          router.push({
-            pathname: "/pages_admin2/add/modal/menu",
-            params: { sort: nextSort }
-          });
-        }}
-        style={{ width: '100%', marginBottom: 10, borderRadius: 10 }}
-        buttonColor="#0284c7" // Warna biru untuk aksi positif
-      >
-        Tambah Menu
-      </Button>
+            <Dialog.Actions
+            style={{ flexDirection: 'column', justifyContent: 'center', paddingBottom: 20, paddingHorizontal: 20, }}
+            >
+            <Button
+                mode="contained"
+                onPress={() => {
+                const nextSort = getNextRootSort();
+                setOpenAddDialog(false);
+                router.push({
+                    pathname: "/pages_admin2/add/modal/menu",
+                    params: { sort: nextSort }
+                });
+                }}
+                style={{ width: '100%', marginBottom: 10, borderRadius: 10 }}
+                buttonColor="#0284c7" 
+            >
+                Tambah Menu
+            </Button>
 
-      <Button
-        mode="outlined"
-        onPress={() => {
-          const nextSort = getNextRootSort();
-          setOpenAddDialog(false);
-          router.push({
-            pathname: "/pages_admin2/add/modal/page",
-            params: { sort: nextSort }
-          });
-        }}
-        style={{ width: '100%', borderRadius: 10 }}
-        textColor="#0284c7"
-      >
-        Tambah Halaman
-      </Button>
-      
-      <Button 
-        onPress={() => setOpenAddDialog(false)} 
-        textColor="#94a3b8"
-        style={{ marginTop: 10 }}
-      >
-        Batal
-      </Button>
-    </Dialog.Actions>
-  </Dialog>
-</Portal>
+            <Button
+                mode="outlined"
+                onPress={() => {
+                const nextSort = getNextRootSort();
+                setOpenAddDialog(false);
+                router.push({
+                    pathname: "/pages_admin2/add/modal/page",
+                    params: { sort: nextSort }
+                });
+                }}
+                style={{ width: '100%', borderRadius: 10 }}
+                textColor="#0284c7"
+            >
+                Tambah Halaman
+            </Button>
+            
+            <Button 
+                onPress={() => setOpenAddDialog(false)}
+                textColor="#94a3b8"
+                style={{ marginTop: 10 }}
+            >
+                Batal
+            </Button>
+            </Dialog.Actions>
+        </Dialog>
+        </Portal>
     </View>
   );
 }

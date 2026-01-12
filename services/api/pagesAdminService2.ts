@@ -15,7 +15,7 @@ export interface PageAdminItem {
   sort: number;
 
   type: "menu" | "page";
-  is_expandable: boolean;
+  
 
   active: boolean;
   can_view_by: string[];
@@ -23,6 +23,7 @@ export interface PageAdminItem {
   permissions_type?: { [key: string]: string };
   useRole?: boolean;
   icon?: string;
+  children?: PageAdminItem[];
 }
 
 export interface PagesAdminList2Response {
@@ -36,5 +37,20 @@ export interface PagesAdminList2Response {
 
 export const getPagesAdminList2 = async (): Promise<PagesAdminList2Response> => {
   const res = await api.get("/getPagesAdminList2");
+  return res.data;
+};
+
+
+
+// === SAVE STRUCTURE (BULK) ===
+export const savePagesAdminStructure = async (items: PageAdminItem[]) => {
+  // Kita perlu membersihkan data sebelum dikirim (hapus children nested agar payload ringan)
+  // Backend hanya menerima Flat List
+  const sanitizedItems = items.map((item) => {
+    const { children, ...rest } = item;
+    return rest;
+  });
+
+  const res = await api.post("/addPagesAdmin2", { items: sanitizedItems });
   return res.data;
 };

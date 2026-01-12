@@ -1,5 +1,5 @@
 // C:\Users\WIN10\laundryadminapp\app\_layout.tsx
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Platform,
@@ -22,6 +22,10 @@ import { useSnackbarStore } from "../store/useSnackbarStore";
 import { useAuthStore } from "../store/useAuthStore";
 import { initAuthTokenListener } from "../services/authTokenListener";
 
+// === IMPORTS UNTUK DYNAMIC MENU ===
+import { getPagesAdminList2 } from "../services/api/pagesAdminService2";
+import { transformMenuData, DrawerMenuItem } from "../utils/menuHelper";
+
 // =========================
 // THEME
 // =========================
@@ -40,9 +44,6 @@ const theme = {
 /**
  * =========================================================
  * AppInitializer
- * - hydrate zustand (1x)
- * - start firebase auth token listener (1x)
- * - BLOCK UI sampai hydrate selesai
  * =========================================================
  */
 function AppInitializer({ children }: { children: React.ReactNode }) {
@@ -104,6 +105,29 @@ export default function Layout() {
   ).current;
   const [openMapVersion, setOpenMapVersion] = React.useState(0);
 
+  // === STATE BARU: MENU ITEMS DARI API ===
+  const [menuItems, setMenuItems] = useState<DrawerMenuItem[]>([]);
+
+  // === FETCH MENU DATA ===
+  useEffect(() => {
+    const fetchMenu = async () => {
+      try {
+        const response = await getPagesAdminList2();
+        if (response.success && response.data) {
+          // Transform data flat -> tree
+          const tree = transformMenuData(response.data);
+          setMenuItems(tree);
+        } else {
+          console.warn("Gagal mengambil data menu");
+        }
+      } catch (err) {
+        console.error("Error fetch menu:", err);
+      }
+    };
+
+    fetchMenu();
+  }, []);
+
   // Drawer responsiveness
   useEffect(() => {
     if (isDocked) {
@@ -116,9 +140,7 @@ export default function Layout() {
   }, [isOverlay, isDocked, width]);
 
   const openDrawer = () => {
-    if (isDocked) return;
     setDrawerOpen(true);
-
     Animated.timing(slideAnim, {
       toValue: 0,
       duration: 150,
@@ -127,7 +149,6 @@ export default function Layout() {
   };
 
   const closeDrawer = () => {
-    if (isDocked) return;
     Animated.timing(slideAnim, {
       toValue: -drawerWidth,
       duration: 250,
@@ -156,7 +177,7 @@ export default function Layout() {
                   bottom: 0,
                   left: 0,
                   right: 0,
-                  zIndex: 999998, // Di bawah snackbar, di atas UI lain
+                  zIndex: 999998,
                 }}
                 onPress={snackbar.hideSnackbar}
               />
@@ -169,9 +190,8 @@ export default function Layout() {
               type={snackbar.type}
             />
 
-
             <View style={{ flex: 1, backgroundColor: "#f6f7f8" }}>
-              {/* Hidden drawer width calc */}
+              {/* Hidden drawer width calc (WEB DOCKED) */}
               {isWeb && isDocked && (
                 <View
                   key={openMapVersion}
@@ -181,10 +201,15 @@ export default function Layout() {
                     if (drawerWidth !== w) setDrawerWidth(w);
                   }}
                 >
-                  <DrawerMenu onClose={() => { }} onMenuTreeChange={() => setOpenMapVersion((prev) => prev + 1)} />
+                  <DrawerMenu
+                    menuItems={menuItems}
+                    onClose={() => {}}
+                    onMenuTreeChange={() => setOpenMapVersion((prev) => prev + 1)}
+                  />
                 </View>
               )}
 
+              {/* ACTIVE DRAWER (VISIBLE OR SLIDING) */}
               {(isDrawerOpen || isDocked) && (
                 <>
                   {isOverlay && (
@@ -216,25 +241,50 @@ export default function Layout() {
                       transform: [{ translateX: slideAnim }],
                     }}
                   >
-                    <DrawerMenu onClose={closeDrawer} onMenuTreeChange={() => setOpenMapVersion((prev) => prev + 1)} />
+                    <DrawerMenu
+                      menuItems={menuItems}
+                      onClose={closeDrawer}
+                      onMenuTreeChange={() =>
+                        setOpenMapVersion((prev) => prev + 1)
+                      }
+                    />
                   </Animated.View>
                 </>
               )}
 
+              {/* CONTENT AREA (STACK) - SEKARANG FLEKSIBEL */}
               <Animated.View
                 style={{
                   flex: 1,
                   backgroundColor: "#f6f7f8",
-                  marginLeft: isDocked ? drawerWidth : 0,
-                  transition: isWeb ? "margin 0.25s ease" : undefined,
+                  marginLeft: isDocked
+                    ? slideAnim.interpolate({
+                        inputRange: [-drawerWidth, 0],
+                        outputRange: [0, drawerWidth],
+                        extrapolate: "clamp",
+                      })
+                    : 0,
+                  // transition properti dihapus agar animasi JS berjalan mulus
                 }}
               >
                 <Stack screenOptions={{ headerShown: false }} />
               </Animated.View>
 
               {!hideBottomNav && (
-                <View style={{ position: "absolute", bottom: 0, left: 0, right: 0, zIndex: 100 }}>
-                  <BottomNav onMenuPress={openDrawer} onMenuClose={closeDrawer} isDrawerOpen={isDrawerOpen} />
+                <View
+                  style={{
+                    position: "absolute",
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    zIndex: 100,
+                  }}
+                >
+                  <BottomNav
+                    onMenuPress={openDrawer}
+                    onMenuClose={closeDrawer}
+                    isDrawerOpen={isDrawerOpen}
+                  />
                 </View>
               )}
             </View>

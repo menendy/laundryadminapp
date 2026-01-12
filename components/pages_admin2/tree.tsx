@@ -183,7 +183,10 @@ export const TreeItem = memo(function TreeItemComponent({ node, level }: { node:
                                             name: node.name || "",
                                             icon: node.icon || "",
                                             path: node.path || "",
-                                            component: node.component || ""
+                                            component: node.component || "",
+                                            active: String(node.active ?? true), // Convert ke string utk keamanan URL
+                                            useRole: String(node.useRole ?? false),
+                                            can_view_by: node.can_view_by || []
                                         }
                                     });
                             }}
@@ -225,14 +228,81 @@ export const TreeItem = memo(function TreeItemComponent({ node, level }: { node:
                 </View>
             )}
 
-            {/* --- DIALOGS --- */}
 
+
+            {/* Dialog Add Menu (UPDATED STYLE) */}
             <Portal>
-                <Dialog visible={openAddMenuDialog} onDismiss={() => setOpenAddMenuDialog(false)}>
-                    <Dialog.Title>Tambah ke: {node.name}</Dialog.Title>
-                    <Dialog.Actions>
-                        <Button onPress={() => { setOpenAddMenuDialog(false); router.push({ pathname: "/pages_admin2/add/modal/menu", params: { parent_id: node.id, sort: getNextChildSort() } }); }}>Sub Menu</Button>
-                        <Button onPress={() => { setOpenAddMenuDialog(false); router.push({ pathname: "/pages_admin2/add/modal/page", params: { parent_id: node.id, sort: getNextChildSort() } }); }}>Page</Button>
+                <Dialog
+                    visible={openAddMenuDialog}
+                    onDismiss={() => setOpenAddMenuDialog(false)}
+                    style={{
+                        backgroundColor: 'white',
+                        width: 380,
+                        alignSelf: 'center',
+                        borderRadius: 20
+                    }}
+                >
+                    <Dialog.Title style={{ color: '#0f172a', textAlign: 'center', fontWeight: 'bold' }}>
+                        Tambah ke: {node.name}
+                    </Dialog.Title>
+
+                    <Dialog.Content>
+                        <PaperText
+                            variant="bodyMedium"
+                            style={{ color: '#64748b', textAlign: 'center', marginBottom: 10 }}
+                        >
+                            Silakan pilih jenis item yang ingin Anda tambahkan ke dalam menu ini.
+                        </PaperText>
+                    </Dialog.Content>
+
+                    <Dialog.Actions
+                        style={{
+                            flexDirection: 'column',
+                            justifyContent: 'center',
+                            paddingBottom: 20,
+                            paddingHorizontal: 20
+                        }}
+                    >
+                        {/* Tombol Tambah Sub Menu (Primary) */}
+                        <Button
+                            mode="contained"
+                            onPress={() => {
+                                setOpenAddMenuDialog(false);
+                                router.push({
+                                    pathname: "/pages_admin2/add/modal/menu",
+                                    params: { parent_id: node.id, sort: getNextChildSort() }
+                                });
+                            }}
+                            style={{ width: '100%', marginBottom: 10, borderRadius: 10 }}
+                            buttonColor="#0284c7"
+                        >
+                            Sub Menu
+                        </Button>
+
+                        {/* Tombol Tambah Page (Secondary/Outlined) */}
+                        <Button
+                            mode="outlined"
+                            onPress={() => {
+                                setOpenAddMenuDialog(false);
+                                router.push({
+                                    pathname: "/pages_admin2/add/modal/page",
+                                    params: { parent_id: node.id, sort: getNextChildSort() }
+                                });
+                            }}
+                            style={{ width: '100%', borderRadius: 10 }}
+                            textColor="#0284c7"
+                        >
+                            Page
+                        </Button>
+
+                        {/* Tombol Batal */}
+                        <Button
+                            onPress={() => setOpenAddMenuDialog(false)}
+                            textColor="#94a3b8"
+                            style={{ marginTop: 10 }}
+                        >
+                            Batal
+                        </Button>
                     </Dialog.Actions>
                 </Dialog>
             </Portal>
