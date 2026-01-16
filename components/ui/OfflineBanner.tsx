@@ -1,34 +1,53 @@
 import React, { useEffect, useRef, useState } from "react";
-import { View, Text, Animated, Platform } from "react-native";
+import { Text, Animated, Platform } from "react-native";
 import NetInfo from "@react-native-community/netinfo";
+import { useQueryClient } from "@tanstack/react-query"; // Tambahkan ini
+import { useSnackbarStore } from "../../store/useSnackbarStore";
 
 export default function OfflineBanner() {
   const [isConnected, setIsConnected] = useState<boolean | null>(null);
   const [isReady, setIsReady] = useState(false);
-  const slideAnim = useRef(new Animated.Value(-50)).current;
+  const slideAnim = useRef(new Animated.Value(-100)).current;
+  
+  const queryClient = useQueryClient(); // Inisialisasi Query Client
+  const showSnackbar = useSnackbarStore((s) => s.showSnackbar);
+  const isFirstRender = useRef(true);
 
-  // 🔌 Listener utama untuk koneksi
   useEffect(() => {
     const unsubscribe = NetInfo.addEventListener((state) => {
       const connected = !!state.isConnected;
       setIsConnected(connected);
       if (!isReady) setIsReady(true);
-    });
-    return () => unsubscribe();
-  }, [isReady]);
 
-  // 🎞️ Animasi muncul/hilang banner
+      // Logika Notifikasi & Sinkronisasi
+      if (!isFirstRender.current) {
+        if (connected) {
+          // 1. Notifikasi Online
+          showSnackbar("Kembali Online! Data sedang disinkronkan.", "success");
+          
+          // 2. OTOMATIS REFRESH DATA (Logic yang Anda minta)
+          // Semua query yang sedang aktif akan ditarik ulang dari database Firebase
+          queryClient.invalidateQueries(); 
+        } else {
+          // 3. Notifikasi Offline
+          showSnackbar("Koneksi terputus. Periksa database atau internet Anda.", "error");
+        }
+      } else {
+        isFirstRender.current = false;
+      }
+    });
+
+    return () => unsubscribe();
+  }, [isReady, showSnackbar, queryClient]);
+
   useEffect(() => {
-    if (!isReady) return; // pastikan status sudah diketahui
+    if (!isReady) return;
     Animated.timing(slideAnim, {
-      toValue: isConnected ? -50 : 0,
+      toValue: isConnected ? -100 : 0,
       duration: 400,
       useNativeDriver: true,
     }).start();
   }, [isConnected, isReady]);
-
-  // 🎨 Render banner
-  const isOffline = isReady && isConnected === false;
 
   return (
     <Animated.View
@@ -39,27 +58,15 @@ export default function OfflineBanner() {
         right: 0,
         backgroundColor: "#d32f2f",
         paddingVertical: 10,
-        zIndex: 9999,
+        zIndex: 99999,
         transform: [{ translateY: slideAnim }],
-        elevation: 6,
-        shadowColor: "#000",
-        shadowOpacity: 0.3,
-        shadowRadius: 3,
+        elevation: 10,
       }}
-      pointerEvents="none" // biar tidak ganggu tap area lain
+      pointerEvents="none"
     >
-      {isOffline && (
-        <Text
-          style={{
-            textAlign: "center",
-            color: "white",
-            fontWeight: "600",
-            fontSize: 14,
-          }}
-        >
-          ⚠️ Tidak ada koneksi internet
-        </Text>
-      )}
+      <Text style={{ textAlign: "center", color: "white", fontWeight: "600" }}>
+        ⚠️ Tidak ada koneksi internet
+      </Text>
     </Animated.View>
   );
 }

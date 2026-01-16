@@ -31,12 +31,25 @@ export interface PagesAdminList2Response {
   data: PageAdminItem[];
   message?: string;
   status?: number;
+  
 }
 
 /* ================= API ================= */
 
-export const getPagesAdminList2 = async (): Promise<PagesAdminList2Response> => {
-  const res = await api.get("/getPagesAdminList2");
+export const getPagesAdminList2 = async (
+  rootPath?: string, 
+  basePath?: string
+): Promise<PagesAdminList2Response> => {
+  
+  // Masukkan ke dalam params agar menjadi query string:
+  // /getPagesAdminList2?rootPath=...&basePath=...
+  const res = await api.get("/getPagesAdminList2", { 
+    params: { 
+      rootPath, 
+      basePath 
+    } 
+  });
+  
   return res.data;
 };
 

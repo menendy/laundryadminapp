@@ -1,14 +1,19 @@
-import React, { useEffect, useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   ScrollView,
   TouchableWithoutFeedback,
   StyleSheet,
+  Platform,
+  Keyboard, // ✅ Pastikan Keyboard diimport
+  InteractionManager,
+  Dimensions,
+  KeyboardAvoidingView,
 } from "react-native";
 import Modal from "react-native-modal";
 import { Button, IconButton, Text } from "react-native-paper";
 import { useRouter, useLocalSearchParams } from "expo-router";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, { useSharedValue, withTiming } from "react-native-reanimated";
 
 import ValidatedInput from "../../../../components/ui/ValidatedInput";
@@ -24,32 +29,82 @@ export default function EditOwnerFieldModal() {
   const insets = useSafeAreaInsets();
   const showSnackbar = useSnackbarStore((s) => s.showSnackbar);
 
-  /**
-   * NOTE:
-   * - value dari parent SUDAH tanpa +62
-   * - simpan sebagai local number (812xxxx)
-   */
-  const [inputValue, setInputValue] = useState(value || "");
+  // --- INITIAL VALUE LOGIC ---
+  const getInitialValue = () => {
+    if (!value) return "";
+    if (field === 'phone') {
+        let clean = value.replace(/[^0-9]/g, ""); 
+        if (clean.startsWith("62")) clean = clean.substring(2); 
+        if (clean.startsWith("0")) clean = clean.substring(1);  
+        return clean;
+    }
+    return value;
+  };
+
+  const [inputValue, setInputValue] = useState(getInitialValue());
   const [errors, setErrors] = useState<any>({});
   const [saving, setSaving] = useState(false);
+  
+  // STATE KONTROL VISIBILITAS
+  const [isVisible, setIsVisible] = useState(false);
+  const [isKeyboardVisible, setKeyboardVisible] = useState(false);
 
+  // 🔥 1. REF UNTUK DATA UPDATE (Anti-Blink)
+  const pendingUpdate = useRef<{ field: string; value: string } | null>(null);
+
+  const overlayOpacity = useSharedValue(0);
+
+  useEffect(() => {
+    const interactionPromise = InteractionManager.runAfterInteractions(() => {
+      setIsVisible(true);
+      overlayOpacity.value = withTiming(1, { duration: 300 });
+    });
+
+    const showSub = Keyboard.addListener(
+      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow",
+      () => setKeyboardVisible(true)
+    );
+    const hideSub = Keyboard.addListener(
+      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide",
+      () => setKeyboardVisible(false)
+    );
+
+    return () => {
+      interactionPromise.cancel();
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
+
+  const close = () => {
+    overlayOpacity.value = withTiming(0, { duration: 250 });
+    setIsVisible(false);
+  };
+
+  // 🔥 2. LOGIC EKSEKUSI DI SINI (Setelah modal hilang visualnya)
+  const onModalHide = () => {
+    if (pendingUpdate.current) {
+        // Eksekusi setParams di sini agar tidak memicu re-render saat animasi berjalan
+        router.setParams({
+            updatedField: pendingUpdate.current.field,
+            updatedValue: pendingUpdate.current.value,
+        });
+        
+        showSnackbar("Perubahan disimpan", "success");
+    }
+
+    // Selalu back di akhir
+    router.back();
+  };
 
   const setFieldErrors = (errorMap: any) => {
     setErrors((prev: any) => ({ ...prev, ...errorMap }));
   };
 
-  const overlayOpacity = useSharedValue(0);
-
-  useEffect(() => {
-    overlayOpacity.value = withTiming(1, { duration: 200 });
-  }, []);
-
-  const close = () => {
-    overlayOpacity.value = withTiming(0, { duration: 150 });
-    setTimeout(() => router.back(), 150);
-  };
-
   const handleSave = async () => {
+    // 🔥 3. TUTUP KEYBOARD DULUAN
+    Keyboard.dismiss();
+
     if (!inputValue.trim()) {
       setErrors({ [field]: `${label} tidak boleh kosong` });
       return;
@@ -57,9 +112,16 @@ export default function EditOwnerFieldModal() {
 
     try {
       setSaving(true);
+      
+      let valueToSend = inputValue.trim();
+      if (field === 'phone') {
+          let clean = valueToSend.replace(/[^0-9]/g, ""); 
+          if (clean.startsWith("0")) clean = clean.substring(1);
+          valueToSend = "+62" + clean;
+      }
 
       const res = await updateOwner(String(id), {
-        [field]: inputValue.trim(),
+        [field]: valueToSend,
         rootPath,
         basePath,
       });
@@ -67,124 +129,153 @@ export default function EditOwnerFieldModal() {
       const ok = handleBackendError(res, setErrors, showSnackbar);
       if (!ok) return;
 
-      // realtime update ke parent
-      router.setParams({
-        updatedField: field,
-        updatedValue: inputValue.trim(),
-      });
+      // 🔥 4. SIMPAN DATA KE REF & TUTUP MODAL
+      pendingUpdate.current = {
+          field: field,
+          value: valueToSend
+      };
 
-      showSnackbar("Perubahan disimpan", "success");
       close();
+      
     } catch (err: any) {
-
-      const ok = handleBackendError(err, setFieldErrors, showSnackbar);
-
+      const ok = handleBackendError(err, (errs: any) => setErrors((p: any) => ({ ...p, ...errs })), showSnackbar);
       if (!ok) {
         const data = err?.response?.data;
-
         if (data?.field && data?.message) {
-          setFieldErrors({ [data.field]: data.message });
+          setErrors((prev: any) => ({ ...prev, [data.field]: data.message }));
         }
-
-        return;
       }
-
     } finally {
       setSaving(false);
     }
   };
 
+  // 🔥 5. LOGIC PADDING (Sesuai Benchmark - Tidak ada gap)
+  const containerPaddingBottom = isKeyboardVisible ? 0 : insets.bottom;
+
   return (
     <Modal
-      isVisible
-      swipeDirection="down"
+      isVisible={isVisible}
+      onModalHide={onModalHide} // Pasang listener
+      swipeDirection={Platform.OS === 'web' ? undefined : "down"}
       onBackdropPress={close}
       onSwipeComplete={close}
+      
+      // CONFIG MATCH BENCHMARK
+      hasBackdrop={false} 
       backdropOpacity={0}
+      animationIn="slideInUp"
+      animationOut="slideOutDown"
+      animationInTiming={300}
+      animationOutTiming={300}
+      
+      backdropTransitionOutTiming={0}
+      hideModalContentWhileAnimating={false}
+      useNativeDriver={true} 
+      useNativeDriverForBackdrop={true}
+      coverScreen={true}
+      statusBarTranslucent={true}
       style={{ justifyContent: "flex-end", margin: 0 }}
+      propagateSwipe={true} 
+      avoidKeyboard={false} 
     >
       <Animated.View
-        style={[StyleSheet.absoluteFillObject, { opacity: overlayOpacity.value }]}
+        style={[
+          StyleSheet.absoluteFillObject,
+          { backgroundColor: "rgba(0,0,0,0.5)", opacity: overlayOpacity },
+        ]}
       />
 
       <TouchableWithoutFeedback onPress={close}>
         <View style={StyleSheet.absoluteFillObject} />
       </TouchableWithoutFeedback>
 
-      <SafeAreaView
-        edges={["bottom"]}
-        style={{
-          backgroundColor: "#fff",
-          borderTopLeftRadius: 22,
-          borderTopRightRadius: 22,
-          paddingHorizontal: 18,
-          paddingTop: 10,
-          paddingBottom: Math.max(insets.bottom, 12),
-        }}
+      {/* 🔥 6. KEYBOARD AVOIDING VIEW (Sesuai Benchmark) */}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "padding"}
+        // Enabled hanya jika iOS ATAU keyboard sedang visible
+        enabled={Platform.OS === "ios" || isKeyboardVisible} 
+        style={{ width: "100%" }}
+        keyboardVerticalOffset={0}
       >
-        <ScrollView>
-          <View
-            style={{
-              flexDirection: "row",
-              justifyContent: "space-between",
-              alignItems: "center",
-            }}
-          >
-            <Text style={{ fontSize: 17, fontWeight: "700" }}>
-              Ubah {label}
-            </Text>
+        <View
+          style={{
+            backgroundColor: "#fff",
+            borderTopLeftRadius: 22,
+            borderTopRightRadius: 22,
+            paddingHorizontal: 18,
+            paddingTop: 10,
+            paddingBottom: containerPaddingBottom, // Menggunakan logic benchmark
+          }}
+        >
+          {/* Header */}
+          <View style={styles.header}>
+            <Text style={styles.headerTitle}>Ubah {label}</Text>
             <IconButton icon="close" onPress={close} />
           </View>
 
-          {/* =========================
-              SPECIAL CASE: PHONE
-          ========================== */}
-          {field === "phone" ? (
-            <ValidatedInput
-              label="Nomor Telepon"
-              required
-              keyboardType="phone-pad"
-              placeholder="812xxxxxxx"
-              value={inputValue}
-              onChangeText={(v) => {
-                let clean = v.replace(/[^0-9]/g, "");
+          {/* Input Area */}
+          <View style={{ maxHeight: Dimensions.get('window').height * 0.6 }}> 
+            <ScrollView keyboardShouldPersistTaps="handled">
+              {field === "phone" ? (
+                <ValidatedInput
+                  label="Nomor Telepon"
+                  value={inputValue}
+                  onChangeText={(t) => {
+                    let clean = t.replace(/[^0-9]/g, "");
+                    if (clean.startsWith("0")) clean = clean.substring(1);
+                    setErrors({});
+                    setInputValue(clean);
+                  }}
+                  error={errors.phone} // Sesuaikan dengan key error backend
+                  placeholder="812xxxxxxx"
+                  keyboardType="phone-pad"
+                  prefix={<Text style={{ fontSize: 16, color: "#555" }}>+62</Text>}
+                />
+              ) : (
+                <ValidatedInput
+                  label={label}
+                  value={inputValue}
+                  onChangeText={(t) => {
+                    setErrors({});
+                    setInputValue(t);
+                  }}
+                  error={errors[field]}
+                  placeholder={`Masukkan ${label}`}
+                />
+              )}
+            </ScrollView>
+          </View>
 
-                if (clean.startsWith("0")) {
-                  clean = clean.substring(1);
-                }
-
-                // tetap boleh kosong (biar UX enak)
-                setErrors({});
-                setInputValue(clean);
-              }}
-              error={errors.phone}
-              prefix={
-                <Text style={{ fontSize: 16, color: "#555" }}>+62</Text>
-              }
-            />
-          ) : (
-            <ValidatedInput
-              label={label}
-              value={inputValue}
-              onChangeText={(t) => {
-                setErrors({});
-                setInputValue(t);
-              }}
-              error={errors[field]}
-              placeholder={`Masukkan ${label}`}
-            />
-          )}
-        </ScrollView>
-
-        <Button
-          mode="contained"
-          onPress={handleSave}
-          loading={saving}
-          disabled={saving}
-        >
-          Simpan
-        </Button>
-      </SafeAreaView>
+          {/* Tombol Simpan */}
+          <Button
+            mode="contained"
+            onPress={handleSave}
+            loading={saving}
+            disabled={saving}
+            style={styles.saveButton}
+          >
+            Simpan
+          </Button>
+        </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
+
+const styles = StyleSheet.create({
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  headerTitle: {
+    fontSize: 17,
+    fontWeight: "700",
+  },
+  saveButton: {
+    marginTop: 20,
+    backgroundColor: "#1976D2",
+  }
+});

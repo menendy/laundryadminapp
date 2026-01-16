@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import { View, StyleSheet, ScrollView } from "react-native";
 import { ActivityIndicator, List } from "react-native-paper";
-import { useRouter, useGlobalSearchParams } from "expo-router";
+import { useRouter, useGlobalSearchParams, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import AppHeaderActions from "../../../components/ui/AppHeaderActions";
@@ -61,32 +61,61 @@ export default function EditSysadminScreen() {
         email: "",
     });
 
-    /* ================= LOAD ================= */
+    /* ================= LOAD (WITH FOCUS GUARD) ================= */
 
-    const loadData = async () => {
-        try {
-            const res = await getSysadminById(String(id));
+    useFocusEffect(
+        useCallback(() => {
+            // Guard 1: Jika ada parameter update dari modal, JANGAN fetch ulang.
+            if (params.updatedField) return;
 
-            setData({
-                name: res.data.name,
-                alias: res.data.alias ?? "",
-                phone: res.data.phone?.replace(/^(\+62|62)/, "") ?? "",
-                email: res.data.email ?? "",
-            });
+            // 🔥 GUARD 2 (BARU): Jika data lokal sudah ada (nama terisi), JANGAN fetch ulang.
+            // Ini mencegah refresh saat user hanya buka-tutup modal (Cancel).
+            if (data.name) return;
 
-            setActive(res.data.active);
-        } catch (err) {
-            handleBackendError(err, setErrors, showSnackbar);
-        } finally {
-            setLoading(false);
-        }
-    };
+            let isMounted = true;
 
-    useEffect(() => {
-        if (id) loadData();
-    }, [id]);
+            const loadData = async () => {
+                if (!id) return;
 
-    /* ================= REALTIME UPDATE ================= */
+                // Guard 3: Hanya tampilkan spinner jika data benar-benar kosong
+                if (!data.name) {
+                    setLoading(true);
+                }
+                
+                try {
+                    const res = await getSysadminById(String(id));
+                    
+                    if (isMounted) {
+                        setData({
+                            name: res.data.name,
+                            alias: res.data.alias ?? "",
+                            phone: res.data.phone?.replace(/^(\+62|62)/, "") ?? "",
+                            email: res.data.email ?? "",
+                        });
+                        setActive(res.data.active);
+                    }
+                } catch (err) {
+                    if (isMounted) {
+                        handleBackendError(err, setErrors, showSnackbar);
+                    }
+                } finally {
+                    if (isMounted) {
+                        setLoading(false);
+                    }
+                }
+            };
+
+            loadData();
+
+            return () => {
+                isMounted = false;
+            };
+            
+            // 🔥 Tambahkan data.name ke dependency array agar useCallback peka terhadap isi data
+        }, [id, params.updatedField, data.name]) 
+    );
+
+    /* ================= REALTIME UPDATE SYNC ================= */
 
     useEffect(() => {
         if (!params.updatedField) return;
@@ -94,12 +123,14 @@ export default function EditSysadminScreen() {
         const f = params.updatedField;
         const v = params.updatedValue ?? "";
 
+        // Update state lokal
         if (f === "name") setData((p) => ({ ...p, name: v }));
         if (f === "alias") setData((p) => ({ ...p, alias: v }));
-        if (f === "phone") setData((p) => ({ ...p, phone: v }));
+        if (f === "phone") setData((p) => ({ ...p, phone: v.replace(/^(\+62|62)/, "") }));
         if (f === "email") setData((p) => ({ ...p, email: v }));
         if (f === "active") setActive(v === "true" || v === "1");
 
+        // Bersihkan params agar Guard di useFocusEffect bisa reset jika diperlukan nanti
         router.setParams({
             updatedField: undefined,
             updatedValue: undefined,
@@ -114,9 +145,9 @@ export default function EditSysadminScreen() {
             params: { id, field, label, value, rootPath, basePath },
         });
 
-
     const handleUpdateStatus = async (value: boolean) => {
         try {
+            setSaving(true);
             const res = await updateSysadmin(String(id), {
                 active: value,
                 rootPath,
@@ -131,28 +162,35 @@ export default function EditSysadminScreen() {
         } catch (err) {
             handleBackendError(err, setErrors, showSnackbar);
             return false;
+        } finally {
+            setSaving(false);
         }
     };
 
-      const handleDelete = async () => {
+    const handleDelete = async () => {
         try {
-          setSaving(true);
-          const res = await deleteSysadmin(String(id), { rootPath, basePath });
-          const ok = handleBackendError(res, setErrors, showSnackbar);
-          if (!ok) return false;
-          showSnackbar("Berhasil dihapus", "success");
-          return true;
-        } finally {
-          setSaving(false);
-        }
-      };
+            setSaving(true);
+            const res = await deleteSysadmin(String(id), { rootPath, basePath });
+            const ok = handleBackendError(res, setErrors, showSnackbar);
+            if (!ok) return false;
 
-    /* ================= UI ================= */
+            showSnackbar("Berhasil dihapus", "success");
+            router.replace("/sysadmin");
+            return true;
+        } catch (err) {
+            handleBackendError(err, setErrors, showSnackbar);
+            return false;
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    /* ================= UI RENDERING ================= */
 
     if (loading) {
         return (
-            <View style={{ flex: 1, justifyContent: "center" }}>
-                <ActivityIndicator size="large" />
+            <View style={styles.loaderContainer}>
+                <ActivityIndicator size="large" color="#1976d2" />
             </View>
         );
     }
@@ -166,20 +204,17 @@ export default function EditSysadminScreen() {
                 contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}
                 showsVerticalScrollIndicator={false}
             >
+                {/* MODAL: KONFIRMASI STATUS */}
                 <ConfirmBottomSheet
                     visible={confirmVisible}
                     title={pendingActiveValue ? "Aktifkan Akun?" : "Nonaktifkan Akun?"}
-                    message={
-                        pendingActiveValue
-                            ? "Apakah Anda yakin ingin mengaktifkan akun sysadmin ini?"
-                            : "Apakah Anda yakin ingin menonaktifkan akun sysadmin ini?"
-                    }
-                    confirmText="Ya, Lanjutkan"
-                    cancelText="Batal"
+                    message={`Apakah Anda yakin ingin ${pendingActiveValue ? 'mengaktifkan' : 'menonaktifkan'} akun sysadmin ini?`}
                     onConfirm={async () => {
                         setConfirmVisible(false);
+                        const prev = active;
                         setActive(pendingActiveValue);
-                        await handleUpdateStatus(pendingActiveValue);
+                        const ok = await handleUpdateStatus(pendingActiveValue);
+                        if (!ok) setActive(prev);
                     }}
                     onCancel={() => {
                         setConfirmVisible(false);
@@ -187,44 +222,17 @@ export default function EditSysadminScreen() {
                     }}
                 />
 
+                {/* MODAL: KONFIRMASI HAPUS */}
                 <ConfirmBottomSheet
                     visible={confirmDeleteVisible}
                     title="Hapus Pengguna?"
-                    message="Apakah Anda yakin ingin menghapus pengguna ini?"
+                    message="Apakah Anda yakin ingin menghapus pengguna sysadmin ini?"
                     confirmText="Ya, Hapus"
-                    cancelText="Batal"
-                    onConfirm={async () => {
-                        setConfirmDeleteVisible(false);
-
-                        const prev = active; // simpan state lama untuk rollback jika perlu
-                        try {
-                            setSaving(true);
-
-                            // panggil API delete
-                            const ok = await handleDelete();
-                            if (!ok) {
-                                setActive(prev); // rollback UI kalau gagal
-                                return;
-                            }
-
-                            showSnackbar("Berhasil dihapus", "success");
-
-                            // kembali ke halaman daftar
-                            router.replace("/sysadmin");
-                        } catch (err) {
-                            handleBackendError(err, setErrors, showSnackbar);
-                            setActive(prev);
-                        } finally {
-                            setSaving(false);
-                        }
-                    }}
-
-                    onCancel={() => {
-                        setConfirmDeleteVisible(false);
-                    }}
+                    onConfirm={handleDelete}
+                    onCancel={() => setConfirmDeleteVisible(false)}
                 />
 
-                {/* === STATUS === */}
+                {/* SECTION: STATUS */}
                 <SectionListCard
                     style={{ marginTop: 16 }}
                     title="Status Akun"
@@ -246,28 +254,25 @@ export default function EditSysadminScreen() {
                     ]}
                 />
 
-                {/* === DATA === */}
+                {/* SECTION: DATA DETAIL */}
                 <SectionListCard
                     title="Data Sysadmin"
                     items={[
-                        ["name", "Nama Lengkap"],
-                        ["alias", "Nama Panggilan"],
-                        ["phone", "No. Handphone"],
-                        ["email", "Email"],
-                    ].map(([field, label]) => ({
-                        label,
-                        value:
-                            field === "phone"
-                                ? data.phone
-                                    ? `+62${data.phone}`
-                                    : "Atur Sekarang"
-                                : (data as any)[field] || "Atur Sekarang",
+                        { label: "Nama Lengkap", field: "name" },
+                        { label: "Nama Panggilan", field: "alias" },
+                        { label: "No. Handphone", field: "phone", prefix: "+62" },
+                        { label: "Email", field: "email" },
+                    ].map((item) => ({
+                        label: item.label,
+                        value: item.prefix 
+                            ? (data.phone ? `${item.prefix}${data.phone}` : "Atur Sekarang")
+                            : ((data as any)[item.field] || "Atur Sekarang"),
                         right: () => <List.Icon icon="chevron-right" />,
-                        onPress: () => goEdit(field, label, (data as any)[field]),
+                        onPress: () => goEdit(item.field, item.label, (data as any)[item.field]),
                     }))}
                 />
 
-                {/* === DELETE === */}
+                {/* SECTION: DELETE ACTION */}
                 <SectionListCard
                     title=""
                     items={[
@@ -280,10 +285,9 @@ export default function EditSysadminScreen() {
                         },
                     ]}
                 />
-
-
             </ScrollView>
 
+            {/* OVERLAY LOADING SAAT SAVE/DELETE */}
             {saving && (
                 <View style={styles.loadingOverlay}>
                     <ActivityIndicator size="large" color="#fff" />
@@ -293,17 +297,13 @@ export default function EditSysadminScreen() {
     );
 }
 
-/* ================= STYLES ================= */
-
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: "#F4F4F4" },
     scroll: { flex: 1 },
+    loaderContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
     loadingOverlay: {
         position: "absolute",
-        top: 0,
-        bottom: 0,
-        left: 0,
-        right: 0,
+        top: 0, bottom: 0, left: 0, right: 0,
         backgroundColor: "rgba(0,0,0,0.4)",
         justifyContent: "center",
         alignItems: "center",

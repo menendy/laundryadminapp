@@ -1,22 +1,18 @@
-import React, { useEffect, useState } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import { View, ScrollView, StyleSheet } from "react-native";
 import { List, ActivityIndicator } from "react-native-paper";
-import { useRouter, useGlobalSearchParams } from "expo-router";
+import { useRouter, useGlobalSearchParams, useFocusEffect } from "expo-router"; // ✅ Tambahkan useFocusEffect
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import AppHeaderActions from "../../../components/ui/AppHeaderActions";
 import SectionListCard from "../../../components/ui/SectionListCard";
 import ToggleSwitch from "../../../components/ui/ToggleSwitch";
 
-import { getAksesPenggunaById, deleteAksesPengguna } from "../../../services/api/aksesPenggunaService";
+import { getAksesPenggunaById, deleteAksesPengguna, updateAksesPengguna } from "../../../services/api/aksesPenggunaService";
 import { useSnackbarStore } from "../../../store/useSnackbarStore";
 import { useBasePath } from "../../../utils/useBasePath";
 import ConfirmBottomSheet from "../../../modals/ConfirmBottomSheet";
-import { updateAksesPengguna } from "../../../services/api/aksesPenggunaService";
 import { handleBackendError } from "../../../utils/handleBackendError";
-
-
-
 
 export default function EditAksesPenggunaScreen() {
   const router = useRouter();
@@ -39,41 +35,71 @@ export default function EditAksesPenggunaScreen() {
   const [confirmDeleteVisible, setConfirmDeleteVisible] = useState(false);
   const [errors, setErrors] = useState<any>({});
 
-  const loadData = async () => {
-    try {
+  /* ======================================================
+     🔥 LOAD DATA (WITH FOCUS GUARD & PARAMETER GUARD)
+     ====================================================== */
+  useFocusEffect(
+    useCallback(() => {
+      // ✅ 1. PARAMETER GUARD:
+      // Jika terdeteksi ada parameter update dari modal, JANGAN jalankan fetch ulang.
+      // Ini mencegah loading spinner muncul dan mencegah data lokal tertimpa data lama server.
+      if (params.updatedField) return;
 
+      let isMounted = true;
 
-      const data = await getAksesPenggunaById(String(id), rootPath, basePath);
+      const loadData = async () => {
+        if (!id) return;
 
-      setName(data.name ?? "");
-      setDesc(data.description ?? "");
-      setAppAccess(data.app_access ?? []);
-      setActive(data.active);
-    } catch (err) {
-      showSnackbar("Gagal memuat data akses pengguna", "error");
-    } finally {
-      setInitialLoading(false);
-    }
-  };
+        // ✅ 2. CONDITIONAL LOADING:
+        // Hanya tampilkan spinner jika data benar-benar masih kosong (First Load).
+        if (!name) {
+          setInitialLoading(true);
+        }
 
+        try {
+          const data = await getAksesPenggunaById(String(id), rootPath, basePath);
+
+          if (isMounted) {
+            setName(data.name ?? "");
+            setDesc(data.description ?? "");
+            setAppAccess(data.app_access ?? []);
+            setActive(data.active);
+          }
+        } catch (err) {
+          if (isMounted) {
+            handleBackendError(err, setErrors, showSnackbar);
+          }
+        } finally {
+          if (isMounted) {
+            setInitialLoading(false);
+          }
+        }
+      };
+
+      loadData();
+
+      return () => {
+        // Cleanup: Hentikan update state jika user pindah screen sebelum API selesai
+        isMounted = false;
+      };
+      // Masukkan dependencies yang relevan
+    }, [id, rootPath, basePath, params.updatedField])
+  );
+
+  /* ======================================================
+     🔥 REALTIME UPDATE DARI MODAL (router.setParams)
+     ====================================================== */
   useEffect(() => {
-    if (id) loadData();
-  }, [id]);
-
-  // ======================================================
-  // 🔥 REALTIME UPDATE DARI MODAL (router.setParams)
-  // ======================================================
-  useEffect(() => {
-    
-
     if (params.updatedField && params.updatedValue !== undefined) {
-      //console.log("Realtime update ⬅️", params.updatedField, params.updatedValue);
+      const f = params.updatedField;
+      const v = params.updatedValue;
 
-      if (params.updatedField === "name") setName(String(params.updatedValue));
-      if (params.updatedField === "desc") setDesc(String(params.updatedValue));
-      if (params.updatedField === "active") setActive(Boolean(params.updatedValue));
+      if (f === "name") setName(String(v));
+      if (f === "desc") setDesc(String(v));
+      if (f === "active") setActive(v === "true" || v === true);
 
-      // reset untuk hindari efek looping
+      // ✅ PENTING: Bersihkan params agar Parameter Guard di useFocusEffect 
+      // bisa terbuka kembali jika user keluar-masuk halaman ini lagi.
       router.setParams({
         updatedField: undefined,
         updatedValue: undefined,
@@ -81,13 +107,8 @@ export default function EditAksesPenggunaScreen() {
     }
   }, [params.updatedField, params.updatedValue]);
 
-
-  useEffect(() => {
-  }, [name, desc, active]);
-
   const handleUpdate = async (value: boolean) => {
     try {
-      //setSaving(true);
       const payload = { active: value, rootPath, basePath };
       const res = await updateAksesPengguna(String(id), payload);
       const ok = handleBackendError(res, setErrors, showSnackbar);
@@ -97,8 +118,6 @@ export default function EditAksesPenggunaScreen() {
     } catch (err) {
       handleBackendError(err, setErrors, showSnackbar);
       return false;
-    } finally {
-      //setSaving(false);
     }
   };
 
@@ -108,21 +127,22 @@ export default function EditAksesPenggunaScreen() {
       const res = await deleteAksesPengguna(String(id), { rootPath, basePath });
       const ok = handleBackendError(res, setErrors, showSnackbar);
       if (!ok) return false;
+
       showSnackbar("Berhasil dihapus", "success");
+      router.replace("/akses_pengguna");
       return true;
+    } catch (err) {
+      handleBackendError(err, setErrors, showSnackbar);
+      return false;
     } finally {
       setSaving(false);
     }
   };
 
-
-  // ======================================================
-
   if (initialLoading) {
-
     return (
-      <View style={{ flex: 1, justifyContent: "center" }}>
-        <ActivityIndicator size="large" />
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+        <ActivityIndicator size="large" color="#1976d2" />
       </View>
     );
   }
@@ -131,16 +151,12 @@ export default function EditAksesPenggunaScreen() {
     <View style={{ flex: 1, backgroundColor: "#F4F4F4" }}>
       <AppHeaderActions showBack title="Data Akses Pengguna" />
 
-
-
       <ScrollView
         contentContainerStyle={{
           paddingBottom: insets.bottom + 100,
           paddingHorizontal: 16,
         }}
       >
-
-
         <ConfirmBottomSheet
           visible={confirmVisible}
           title={pendingActiveValue ? "Aktifkan Akun?" : "Nonaktifkan Akun?"}
@@ -160,7 +176,7 @@ export default function EditAksesPenggunaScreen() {
           }}
           onCancel={() => {
             setConfirmVisible(false);
-            setActive(active); // pastikan revert UI
+            setActive(active);
           }}
         />
 
@@ -169,39 +185,10 @@ export default function EditAksesPenggunaScreen() {
           title="Hapus Akses Pengguna?"
           message="Apakah Anda yakin ingin menghapus Pengguna ini?"
           confirmText="Ya, Hapus"
-          cancelText="Batal"
-          onConfirm={async () => {
-            setConfirmDeleteVisible(false);
-
-            const prev = active; // simpan state lama untuk rollback jika perlu
-            try {
-              //setSaving(true);
-
-              // panggil API delete
-              const ok = await handleDelete();
-              if (!ok) {
-                setActive(prev); // rollback UI kalau gagal
-                return;
-              }
-
-              showSnackbar("Berhasil dihapus", "success");
-
-              // kembali ke halaman daftar
-              router.replace("/akses_pengguna");
-            } catch (err) {
-              handleBackendError(err, setErrors, showSnackbar);
-              setActive(prev);
-            } finally {
-              //setSaving(false);
-            }
-          }}
-
-          onCancel={() => {
-            setConfirmDeleteVisible(false);
-          }}
+          onCancel={() => setConfirmDeleteVisible(false)}
+          onConfirm={handleDelete}
         />
 
-        {/* STATUS */}
         <SectionListCard
           title=""
           style={{ marginTop: 16 }}
@@ -212,17 +199,16 @@ export default function EditAksesPenggunaScreen() {
               right: () => (
                 <ToggleSwitch
                   value={active}
-                  //disabled={saving}
                   onChange={(val) => {
                     setPendingActiveValue(val);
                     setConfirmVisible(true);
                   }}
-                />),
+                />
+              ),
             },
           ]}
         />
 
-        {/* NAME + DESC */}
         <SectionListCard
           title=""
           items={[
@@ -233,14 +219,7 @@ export default function EditAksesPenggunaScreen() {
               onPress: () =>
                 router.push({
                   pathname: "/akses_pengguna/edit/modal/[field]",
-                  params: {
-                    id,
-                    field: "name",
-                    label: "Nama Akses",
-                    value: name,
-                    rootPath,
-                    basePath,
-                  },
+                  params: { id, field: "name", label: "Nama Akses", value: name, rootPath, basePath },
                 }),
             },
             {
@@ -250,20 +229,12 @@ export default function EditAksesPenggunaScreen() {
               onPress: () =>
                 router.push({
                   pathname: "/akses_pengguna/edit/modal/[field]",
-                  params: {
-                    id,
-                    field: "desc",
-                    label: "Deskripsi",
-                    value: desc,
-                    rootPath,
-                    basePath,
-                  },
+                  params: { id, field: "desc", label: "Deskripsi", value: desc, rootPath, basePath },
                 }),
             },
           ]}
         />
 
-        {/* PERMISSIONS */}
         <SectionListCard
           title="Pengaturan Akses Aplikasi"
           items={[
@@ -273,7 +244,7 @@ export default function EditAksesPenggunaScreen() {
               right: () => <List.Icon icon="chevron-right" />,
               onPress: () =>
                 router.push({
-                  pathname: "",
+                  pathname: "", // Isi dengan path yang benar jika sudah ada
                   params: { roleId: id, rootPath, basePath },
                 }),
             },
@@ -290,7 +261,6 @@ export default function EditAksesPenggunaScreen() {
           ]}
         />
 
-        {/* DELETE */}
         <SectionListCard
           title=""
           items={[
@@ -315,14 +285,9 @@ export default function EditAksesPenggunaScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F4F4F4" },
-  scroll: { flex: 1 },
   loadingOverlay: {
     position: "absolute",
-    top: 0,
-    bottom: 0,
-    left: 0,
-    right: 0,
+    top: 0, bottom: 0, left: 0, right: 0,
     backgroundColor: "rgba(0,0,0,0.4)",
     justifyContent: "center",
     alignItems: "center",

@@ -5,8 +5,9 @@ export default function ModalLayout() {
     <Stack
       screenOptions={{
         presentation: "transparentModal",
-        animation: "slide_from_bottom",
+        animation: "none", // 🔥 PENTING: Matikan animasi router agar tidak kedip/jeda
         headerShown: false,
+        //contentStyle: { backgroundColor: 'transparent' },
       }}
     />
   );

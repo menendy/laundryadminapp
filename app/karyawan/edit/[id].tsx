@@ -1,13 +1,13 @@
-import React, { useState, useEffect } from "react";
-import { useFocusEffect } from "@react-navigation/native";
+import React, { useState, useCallback, useEffect } from "react";
 import { View, StyleSheet, ScrollView } from "react-native";
 import { ActivityIndicator, List } from "react-native-paper";
-import { useRouter, useGlobalSearchParams } from "expo-router";
+import { useRouter, useGlobalSearchParams, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import AppHeaderActions from "../../../components/ui/AppHeaderActions";
 import SectionListCard from "../../../components/ui/SectionListCard";
 import ToggleSwitch from "../../../components/ui/ToggleSwitch";
+import ConfirmBottomSheet from "../../../modals/ConfirmBottomSheet";
 
 import {
   getMitraById,
@@ -18,7 +18,6 @@ import {
 import { useSnackbarStore } from "../../../store/useSnackbarStore";
 import { useBasePath } from "../../../utils/useBasePath";
 import { handleBackendError } from "../../../utils/handleBackendError";
-import ConfirmBottomSheet from "../../../modals/ConfirmBottomSheet";
 
 /* ================= TYPES ================= */
 
@@ -66,34 +65,60 @@ export default function EditKaryawanScreen() {
   const [confirmDeleteVisible, setConfirmDeleteVisible] = useState(false);
   const [pendingActiveValue, setPendingActiveValue] = useState(active);
 
-  /* ================= LOAD DATA ================= */
+  /* ================= LOAD DATA (WITH FOCUS GUARD) ================= */
 
-  const loadData = async () => {
-    try {
-      const res = await getMitraById(id as string, rootPath, basePath);
+  useFocusEffect(
+    useCallback(() => {
+      // 🔥 STRATEGI 1: PARAMETER GUARD
+      // Jika terdeteksi ada parameter update dari modal, JANGAN lakukan fetch ulang.
+      // Ini mencegah loading spinner muncul dan mencegah data lokal tertimpa data lama server.
+      if (params.updatedField) return;
 
-      setData({
-        name: res.name,
-        alias: res.alias,
-        phone: res.phone?.replace(/^(\+62|62)/, "") ?? "",
-        email: res.email,
-        address: res.alamat,
-      });
+      let isMounted = true;
 
-      setActive(res.active);
-      setRolesAdmin(res.roleNameAdmin);
-    } catch (err) {
-      handleBackendError(err, setErrors, showSnackbar);
-    } finally {
-      setLoading(false);
-    }
-  };
+      const loadData = async () => {
+        if (!id) return;
 
-  useEffect(() => {
-    if (id) loadData();
-  }, [id]);
+        // 🔥 STRATEGI 2: CONDITIONAL LOADING
+        // Hanya tampilkan loading spinner jika data masih kosong (pembukaan pertama).
+        if (!data.name) {
+          setLoading(true);
+        }
 
+        try {
+          const res = await getMitraById(String(id), rootPath, basePath);
 
+          if (isMounted) {
+            setData({
+              name: res.name,
+              alias: res.alias,
+              phone: res.phone?.replace(/^(\+62|62)/, "") ?? "",
+              email: res.email,
+              address: res.alamat,
+            });
+
+            setActive(res.active);
+            setRolesAdmin(res.roleNameAdmin);
+          }
+        } catch (err) {
+          if (isMounted) {
+            handleBackendError(err, setErrors, showSnackbar);
+          }
+        } finally {
+          if (isMounted) {
+            setLoading(false);
+          }
+        }
+      };
+
+      loadData();
+
+      return () => {
+        isMounted = false;
+      };
+      // Tambahkan params.updatedField agar guard selalu mengecek kondisi terbaru
+    }, [id, rootPath, basePath, params.updatedField])
+  );
 
   /* ================= REALTIME UPDATE FROM MODAL ================= */
 
@@ -103,15 +128,17 @@ export default function EditKaryawanScreen() {
     const f = params.updatedField;
     const v = params.updatedValue ?? "";
 
+    // Update state secara lokal agar UI langsung berubah tanpa refresh
     if (f === "name") setData((p) => ({ ...p, name: v }));
     if (f === "alias") setData((p) => ({ ...p, alias: v }));
-    if (f === "phone") setData((p) => ({ ...p, phone: v }));
+    if (f === "phone") setData((p) => ({ ...p, phone: v.replace(/^(\+62|62)/, "") }));
     if (f === "email") setData((p) => ({ ...p, email: v }));
     if (f === "address") setData((p) => ({ ...p, address: v }));
     if (f === "rolesAdmin") setRolesAdmin(v);
     if (f === "active") setActive(v === "true" || v === "1");
 
-    // reset agar tidak trigger ulang
+    // 🔥 PENTING: Bersihkan params agar useFocusEffect bisa berfungsi normal kembali 
+    // jika user berpindah halaman lalu masuk lagi.
     router.setParams({
       updatedField: undefined,
       updatedValue: undefined,
@@ -138,8 +165,9 @@ export default function EditKaryawanScreen() {
       params: { id, rolesAdmin, rootPath, basePath },
     });
 
-  const handleUpdate = async (value: boolean) => {
+  const handleUpdateStatus = async (value: boolean) => {
     try {
+      setSaving(true);
       const res = await updateMitraV2(String(id), {
         active: value,
         rootPath,
@@ -153,6 +181,8 @@ export default function EditKaryawanScreen() {
     } catch (err) {
       handleBackendError(err, setErrors, showSnackbar);
       return false;
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -162,19 +192,24 @@ export default function EditKaryawanScreen() {
       const res = await deleteMitraV2(String(id), { rootPath, basePath });
       const ok = handleBackendError(res, setErrors, showSnackbar);
       if (!ok) return false;
+
       showSnackbar("Berhasil dihapus", "success");
+      router.replace("/karyawan");
       return true;
+    } catch (err) {
+      handleBackendError(err, setErrors, showSnackbar);
+      return false;
     } finally {
       setSaving(false);
     }
   };
 
-  /* ================= UI ================= */
+  /* ================= UI RENDERING ================= */
 
   if (loading) {
     return (
-      <View style={{ flex: 1, justifyContent: "center" }}>
-        <ActivityIndicator size="large" />
+      <View style={styles.centerLoader}>
+        <ActivityIndicator size="large" color="#1976d2" />
       </View>
     );
   }
@@ -188,70 +223,32 @@ export default function EditKaryawanScreen() {
         contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}
         showsVerticalScrollIndicator={false}
       >
-
         <ConfirmBottomSheet
           visible={confirmVisible}
           title={pendingActiveValue ? "Aktifkan Akun?" : "Nonaktifkan Akun?"}
-          message={
-            pendingActiveValue
-              ? "Apakah Anda yakin ingin mengaktifkan akun mitra ini?"
-              : "Apakah Anda yakin ingin menonaktifkan akun mitra ini?"
-          }
-          confirmText="Ya, Lanjutkan"
-          cancelText="Batal"
+          message={`Apakah Anda yakin ingin ${pendingActiveValue ? "mengaktifkan" : "menonaktifkan"} akun mitra ini?`}
           onConfirm={async () => {
             setConfirmVisible(false);
             const prev = active;
             setActive(pendingActiveValue);
-            const ok = await handleUpdate(pendingActiveValue);
-            // if (!ok) setActive(prev);
+            const ok = await handleUpdateStatus(pendingActiveValue);
+            if (!ok) setActive(prev);
           }}
           onCancel={() => {
             setConfirmVisible(false);
-            setActive(active); // pastikan revert UI
+            setActive(active);
           }}
         />
 
         <ConfirmBottomSheet
           visible={confirmDeleteVisible}
           title="Hapus Mitra?"
-          message="Apakah Anda yakin ingin menghapus mitra ini?"
+          message="Apakah Anda yakin ingin menghapus mitra ini? Tindakan ini tidak dapat dibatalkan."
           confirmText="Ya, Hapus"
-          cancelText="Batal"
-          onConfirm={async () => {
-            setConfirmDeleteVisible(false);
-
-            const prev = active; // simpan state lama untuk rollback jika perlu
-            try {
-              setSaving(true);
-
-              // panggil API delete
-              const ok = await handleDelete();
-              if (!ok) {
-                setActive(prev); // rollback UI kalau gagal
-                return;
-              }
-
-              showSnackbar("Berhasil dihapus", "success");
-
-              // kembali ke halaman daftar
-              router.replace("/karyawan");
-            } catch (err) {
-              handleBackendError(err, setErrors, showSnackbar);
-              setActive(prev);
-            } finally {
-              setSaving(false);
-            }
-          }}
-
-          onCancel={() => {
-            setConfirmDeleteVisible(false);
-          }}
+          onConfirm={handleDelete}
+          onCancel={() => setConfirmDeleteVisible(false)}
         />
 
-
-
-        {/* === STATUS === */}
         <SectionListCard
           style={{ marginTop: 16 }}
           title="Status Akun Mitra"
@@ -273,7 +270,6 @@ export default function EditKaryawanScreen() {
           ]}
         />
 
-        {/* === DATA === */}
         <SectionListCard
           title="Data Pribadi"
           items={[
@@ -295,7 +291,6 @@ export default function EditKaryawanScreen() {
           }))}
         />
 
-        {/* === AKSES === */}
         <SectionListCard
           title="Pengaturan Akses"
           items={[
@@ -307,14 +302,13 @@ export default function EditKaryawanScreen() {
             },
             {
               label: "Pengaturan Akses Admin",
-              value: rolesAdmin,
+              value: rolesAdmin || "Belum diatur",
               right: () => <List.Icon icon="chevron-right" />,
               onPress: goEditAksesAdmin,
             },
           ]}
         />
 
-        {/* === DELETE === */}
         <SectionListCard
           title=""
           items={[
@@ -338,11 +332,10 @@ export default function EditKaryawanScreen() {
   );
 }
 
-/* ================= STYLES ================= */
-
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F4F4F4" },
   scroll: { flex: 1 },
+  centerLoader: { flex: 1, justifyContent: "center", alignItems: "center" },
   loadingOverlay: {
     position: "absolute",
     top: 0,

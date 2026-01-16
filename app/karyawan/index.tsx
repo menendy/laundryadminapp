@@ -1,14 +1,5 @@
-import React, { memo } from "react";
-import {
-  View,
-  FlatList,
-  RefreshControl,
-  Keyboard,
-  Text,
-  ToastAndroid,
-  Platform,
-  Pressable,
-} from "react-native";
+import React, { memo, useCallback } from "react";
+import { View, FlatList, RefreshControl, Keyboard, Text, ToastAndroid, Platform, Pressable } from "react-native";
 import { Card, List, ActivityIndicator } from "react-native-paper";
 import Clipboard from "@react-native-clipboard/clipboard";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -17,115 +8,47 @@ import { useRouter } from "expo-router";
 import { getMitraList } from "../../services/api/mitraService";
 import AppHeaderList from "../../components/ui/AppHeaderList";
 import AppSearchBarBottomSheet from "../../components/ui/AppSearchBarBottomSheet";
-import { useUniversalPaginatedList } from "../../hooks/UniversalPaginatedList";
+import { useUniversalPaginatedList } from "../../hooks/useUniversalPaginatedList";
 import { useBasePath } from "../../utils/useBasePath";
 
-
-// ================================
-// ITEM COMPONENT (Updated)
-// ================================
+// Item Component yang dioptimasi dengan React.memo
 const MitraItem = memo(({ item, onEdit }: any) => {
   const copyId = () => {
+    if (!item?.id) return;
     Clipboard.setString(item.id);
-    if (Platform.OS === "android") {
-      ToastAndroid.show("ID berhasil disalin!", ToastAndroid.SHORT);
-    }
+    if (Platform.OS === "android") ToastAndroid.show("ID berhasil disalin!", ToastAndroid.SHORT);
   };
 
   return (
-    <Card
-      style={{
-        backgroundColor: "#fff",
-        borderRadius: 16,
-        borderWidth: 1,
-        borderColor: "#eee",
-        marginHorizontal: 12,
-        marginBottom: 14,
-      }}
-    >
+    <Card style={styles.card}>
       <List.Item
         title={item.name}
-        titleStyle={{ marginBottom: 6, fontWeight: "bold", fontSize: 17 }}
+        titleStyle={styles.cardTitle}
         description={() => (
           <View style={{ marginTop: 4 }}>
-            <View style={{ flexDirection: "row", marginBottom: 2 }}>
+            <View style={styles.row}>
               <MaterialCommunityIcons name="email" size={16} color="#999" />
-              <Text
-                style={{
-                  fontSize: 12,
-                  color: "#666",
-                  marginRight: 8,
-                  marginLeft: 5,
-                }}
-              >
-                {item.email}
-              </Text>
+              <Text style={styles.descText}>{item.email}</Text>
             </View>
-
-            {/* Status Aktif */}
-            <View style={{ flexDirection: "row", marginBottom: 2 }}>
+            <View style={styles.row}>
               <MaterialCommunityIcons
                 name={item.active ? "check-circle" : "close-circle"}
                 size={16}
                 color={item.active ? "green" : "red"}
               />
-              <Text
-                style={{
-                  fontSize: 12,
-                  color: item.active ? "green" : "red",
-                  fontWeight: "600",
-                  marginLeft: 5,
-                }}
-              >
+              <Text style={[styles.statusText, { color: item.active ? "green" : "red" }]}>
                 {item.active ? "Aktif" : "Nonaktif"}
               </Text>
             </View>
-
-            {/* Status Transfer */}
-            {item.status === "transfer" && (
-              <View style={{ flexDirection: "row", marginBottom: 2 }}>
-                <MaterialCommunityIcons
-                  name="swap-horizontal"
-                  size={16}
-                  color="#d97706"
-                />
-                <Text
-                  style={{
-                    fontSize: 12,
-                    color: "#d97706",
-                    fontWeight: "600",
-                    marginLeft: 5,
-                  }}
-                >
-                  Status Mitra: Transfer
-                </Text>
-              </View>
-            )}
-
-            {/* Copy ID */}
-            <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <Text style={{ fontSize: 12, color: "#666", marginRight: 8 }}>
-                {item.id}
-              </Text>
-              <Pressable onPress={copyId}>
-                <MaterialCommunityIcons
-                  name="content-copy"
-                  size={18}
-                  color="#666"
-                  style={{ marginTop: -3, marginLeft: -5 }}
-                />
-              </Pressable>
-            </View>
+            <Pressable onPress={copyId} style={styles.row}>
+              <Text style={styles.idText}>{item.id}</Text>
+              <MaterialCommunityIcons name="content-copy" size={14} color="#666" />
+            </Pressable>
           </View>
         )}
-        descriptionNumberOfLines={6}
         right={() => (
-          <Pressable onPress={() => onEdit(item)} style={{ paddingHorizontal: 3 }}>
-            <MaterialCommunityIcons
-              name="chevron-right"
-              size={28}
-              color="#a3a1a1ff"
-            />
+          <Pressable onPress={() => onEdit(item)} style={styles.chevron}>
+            <MaterialCommunityIcons name="chevron-right" size={28} color="#ccc" />
           </Pressable>
         )}
       />
@@ -133,10 +56,6 @@ const MitraItem = memo(({ item, onEdit }: any) => {
   );
 });
 
-
-// ================================
-// MAIN SCREEN
-// ================================
 export default function KaryawanListScreen() {
   const router = useRouter();
   const { rootBase: rootPath, basePath } = useBasePath();
@@ -148,22 +67,20 @@ export default function KaryawanListScreen() {
     defaultMode: "nama",
   });
 
-  const renderItem = ({ item }: any) => (
+  const renderItem = useCallback(({ item }: any) => (
     <MitraItem item={item} onEdit={(i: any) => router.push(`/karyawan/edit/${i.id}`)} />
-  );
+  ), []);
 
   return (
     <View style={{ flex: 1, backgroundColor: "#f9f9f9" }}>
-      <AppHeaderList
-        title="Daftar Mitra"
-        onAdd={() => router.push("/karyawan/add")}
-      />
+      <AppHeaderList title="Daftar Mitra" onAdd={() => router.push("/karyawan/add")} />
 
       <AppSearchBarBottomSheet
         value={list.search}
         onChangeText={list.setSearch}
         mode={list.mode}
-        onChangeMode={(m) => list.setMode(m)}
+        // FIX: Casting ke union type yang sesuai dengan hook
+        onChangeMode={(m) => list.setMode(m as "nama" | "telp" | "email")}
         categories={[
           { label: "Nama", value: "nama" },
           { label: "Telp", value: "telp" },
@@ -171,42 +88,29 @@ export default function KaryawanListScreen() {
         ]}
       />
 
-      {list.loading && list.items.length === 0 && (
-        <View style={{ paddingTop: 40 }}>
-          <ActivityIndicator size="large" />
-        </View>
-      )}
-
       <FlatList
-        style={{ flex: 1 }}
-        contentContainerStyle={{ paddingBottom: 100 }}
         data={list.items}
-        keyExtractor={(i) => i.id}
+        keyExtractor={(item) => item.id}
         renderItem={renderItem}
-        refreshControl={
-          <RefreshControl
-            refreshing={list.refreshing}
-            onRefresh={list.onRefresh}
-          />
-        }
-        onEndReachedThreshold={0.4}
+        refreshControl={<RefreshControl refreshing={list.refreshing} onRefresh={list.onRefresh} />}
         onEndReached={list.onEndReached}
-        ListEmptyComponent={
-          !list.loading ? (
-            <Text style={{ textAlign: "center", marginTop: 20, color: "#777" }}>
-              Belum ada data
-            </Text>
-          ) : null
-        }
-        ListFooterComponent={
-          list.loading && list.items.length > 0 ? (
-            <ActivityIndicator style={{ marginVertical: 20 }} />
-          ) : null
-        }
+        onEndReachedThreshold={0.5}
+        ListEmptyComponent={!list.loading ? <Text style={styles.emptyText}>Belum ada data</Text> : null}
+        ListFooterComponent={list.loading ? <ActivityIndicator style={{ margin: 20 }} /> : null}
         keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-        onScrollBeginDrag={() => Keyboard.dismiss()}
+        onScrollBeginDrag={Keyboard.dismiss}
       />
     </View>
   );
 }
+
+const styles = {
+  card: { backgroundColor: "#fff", borderRadius: 12, marginHorizontal: 12, marginBottom: 12, elevation: 2 },
+  cardTitle: { fontWeight: "bold", fontSize: 16 },
+  row: { flexDirection: "row", alignItems: "center", marginBottom: 4 },
+  descText: { fontSize: 13, color: "#666", marginLeft: 6 },
+  statusText: { fontSize: 13, fontWeight: "600", marginLeft: 6 },
+  idText: { fontSize: 11, color: "#999", marginRight: 6 },
+  chevron: { justifyContent: "center", paddingRight: 8 },
+  emptyText: { textAlign: "center", marginTop: 40, color: "#999" }
+} as const;

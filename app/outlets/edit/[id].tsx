@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from "react";
-import { View, ScrollView, ActivityIndicator, Text } from "react-native";
+import React, { useState, useCallback } from "react";
+import { View, ScrollView, ActivityIndicator, Text, StyleSheet } from "react-native";
 import { Button } from "react-native-paper";
-import { useRouter, useLocalSearchParams } from "expo-router";
+import { useRouter, useLocalSearchParams, useFocusEffect } from "expo-router";
 import AppHeaderActions from "../../../components/ui/AppHeaderActions";
 import ValidatedInput from "../../../components/ui/ValidatedInput";
 import { useSnackbarStore } from "../../../store/useSnackbarStore";
@@ -12,7 +12,7 @@ import { getOutletById, updateOutlet } from "../../../services/api/outletsServic
 
 export default function EditOutletScreen() {
   const router = useRouter();
-  const { id } = useLocalSearchParams(); // /edit?id=xxxx
+  const { id } = useLocalSearchParams();
 
   const { rootBase: rootPath, basePath } = useBasePath();
   const showSnackbar = useSnackbarStore((s) => s.showSnackbar);
@@ -24,27 +24,53 @@ export default function EditOutletScreen() {
   const [loading, setLoading] = useState(false);
   const [loadingFetch, setLoadingFetch] = useState(true);
   const [errors, setErrors] = useState<any>({});
-  
-  // Load data awal
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const result = await getOutletById(id as string,rootPath,basePath);
-        console.log("Outlet detail:", result);
 
-        setName(result.name || "");
-        setPhone((result.phone || "").replace(/^(\+62|62)/, "")); // hilangkan prefix dulu
-        setAddress(result.address || "");
-      } catch (err) {
-        console.error("❌ Error getOutletById:", err);
-        showSnackbar("Gagal memuat data outlet", "error");
-      } finally {
-        setLoadingFetch(false);
-      }
-    };
+  /* ================= LOAD DATA (WITH FOCUS GUARD) ================= */
 
-    fetchData();
-  }, [id]);
+  /**
+   * ✅ REFACTOR: Menggunakan useFocusEffect + isMounted.
+   * Ini mencegah 'Ghost Fetching' agar API outlet tidak bocor ke screen lain
+   * saat navigasi Stack dilakukan.
+   */
+  useFocusEffect(
+    useCallback(() => {
+      let isMounted = true;
+
+      const fetchData = async () => {
+        if (!id) return;
+        
+        setLoadingFetch(true);
+        try {
+          const result = await getOutletById(id as string, rootPath, basePath);
+          
+          // Guard: Hanya update state jika screen masih fokus
+          if (isMounted) {
+            setName(result.name || "");
+            setPhone((result.phone || "").replace(/^(\+62|62)/, "")); // hilangkan prefix
+            setAddress(result.address || "");
+          }
+        } catch (err) {
+          if (isMounted) {
+            console.error("❌ Error getOutletById:", err);
+            showSnackbar("Gagal memuat data outlet", "error");
+          }
+        } finally {
+          if (isMounted) {
+            setLoadingFetch(false);
+          }
+        }
+      };
+
+      fetchData();
+
+      return () => {
+        // Cleanup: Saat user pindah ke screen lain, isMounted jadi false.
+        isMounted = false;
+      };
+    }, [id, rootPath, basePath])
+  );
+
+  /* ================= VALIDATION & SUBMIT ================= */
 
   const validate = () => {
     const e: any = {};
@@ -66,17 +92,21 @@ export default function EditOutletScreen() {
       setLoading(true);
 
       const payload = {
-        id, name, address, phone, rootPath, basePath,
+        id,
+        name,
+        address,
+        phone,
+        rootPath,
+        basePath,
       };
 
-
-      const result = await updateOutlet( String(id), payload );
+      const result = await updateOutlet(String(id), payload);
 
       const ok = handleBackendError(result, setErrors, showSnackbar);
       if (!ok) return;
 
-      showSnackbar("berhasil diperbarui", "success");
-      router.back(); // karena edit → balik ke list/detail
+      showSnackbar("Berhasil diperbarui", "success");
+      router.back(); // Kembali ke list/detail
 
     } catch (err) {
       console.error("🔥 Error updateOutlet:", err);
@@ -86,19 +116,21 @@ export default function EditOutletScreen() {
     }
   };
 
+  /* ================= UI RENDERING ================= */
+
   if (loadingFetch) {
     return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-        <ActivityIndicator />
+      <View style={styles.centerLoader}>
+        <ActivityIndicator size="large" color="#1976d2" />
       </View>
     );
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: "#f9f9f9" }}>
+    <View style={styles.container}>
       <AppHeaderActions title="Edit Outlet" showBack />
 
-      <ScrollView contentContainerStyle={{ padding: 20 }}>
+      <ScrollView contentContainerStyle={styles.scrollContent}>
         
         <ValidatedInput
           label="Nama Outlet"
@@ -116,14 +148,11 @@ export default function EditOutletScreen() {
           value={phone}
           onChangeText={(v) => {
             let clean = v.replace(/[^0-9]/g, "");
-
             if (clean.startsWith("0")) clean = clean.substring(1);
-
-            // Jangan blokir update saat empty
             setPhone(clean);
           }}
           error={errors.phone}
-          prefix={<Text style={{ fontSize: 16, color: "#555" }}>+62</Text>}
+          prefix={<Text style={styles.phonePrefix}>+62</Text>}
         />
 
         <ValidatedInput
@@ -134,7 +163,7 @@ export default function EditOutletScreen() {
           error={errors.address}
           multiline
           numberOfLines={3}
-          style={{ minHeight: 100, textAlignVertical: "top" }}
+          style={styles.addressInput}
         />
 
         <Button
@@ -142,7 +171,8 @@ export default function EditOutletScreen() {
           onPress={handleSubmit}
           loading={loading}
           disabled={loading}
-          style={{ marginTop: 16 }}
+          style={styles.submitButton}
+          contentStyle={styles.submitButtonContent}
         >
           {loading ? "Menyimpan..." : "Simpan Perubahan"}
         </Button>
@@ -150,3 +180,35 @@ export default function EditOutletScreen() {
     </View>
   );
 }
+
+/* ================= STYLES ================= */
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#f9f9f9",
+  },
+  centerLoader: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  scrollContent: {
+    padding: 20,
+  },
+  phonePrefix: {
+    fontSize: 16,
+    color: "#555",
+  },
+  addressInput: {
+    minHeight: 100,
+    textAlignVertical: "top",
+  },
+  submitButton: {
+    marginTop: 24,
+    borderRadius: 8,
+  },
+  submitButtonContent: {
+    height: 48,
+  },
+});

@@ -1,4 +1,4 @@
-import React, { memo } from "react";
+import React, { memo, useCallback } from "react";
 import {
   View,
   FlatList,
@@ -8,6 +8,7 @@ import {
   ToastAndroid,
   Platform,
   Pressable,
+  StyleSheet,
 } from "react-native";
 import { Card, List, ActivityIndicator } from "react-native-paper";
 import Clipboard from "@react-native-clipboard/clipboard";
@@ -17,14 +18,15 @@ import { useRouter } from "expo-router";
 import { getGlobalUserList } from "../../services/api/globaluserService";
 import AppHeaderList from "../../components/ui/AppHeaderList";
 import AppSearchBarBottomSheet from "../../components/ui/AppSearchBarBottomSheet";
-import { useUniversalPaginatedList } from "../../hooks/UniversalPaginatedList";
+import { useUniversalPaginatedList } from "../../hooks/useUniversalPaginatedList";
 import { useBasePath } from "../../utils/useBasePath";
 
-// ================================
-// ITEM COMPONENT (MATCH SYSADMIN)
-// ================================
-const GlobalUserItem = memo(({ item, onEdit }: any) => {
+// ============================================================
+// ITEM COMPONENT (Optimized & Standardized)
+// ============================================================
+const GlobalUserItem = memo(({ item, onEdit }: { item: any; onEdit: (i: any) => void }) => {
   const copyId = () => {
+    if (!item?.id) return;
     Clipboard.setString(item.id);
     if (Platform.OS === "android") {
       ToastAndroid.show("ID berhasil disalin!", ToastAndroid.SHORT);
@@ -32,78 +34,40 @@ const GlobalUserItem = memo(({ item, onEdit }: any) => {
   };
 
   return (
-    <Card
-      style={{
-        backgroundColor: "#fff",
-        borderRadius: 16,
-        borderWidth: 1,
-        borderColor: "#eee",
-        marginHorizontal: 12,
-        marginBottom: 14,
-      }}
-    >
+    <Card style={styles.card}>
       <List.Item
         title={item.name}
-        titleStyle={{ marginBottom: 6, fontWeight: "bold", fontSize: 17 }}
+        titleStyle={styles.title}
         description={() => (
-          <View style={{ marginTop: 4 }}>
-            {/* Email */}
-            <View style={{ flexDirection: "row", marginBottom: 2 }}>
+          <View style={styles.descContainer}>
+            {/* Email Row */}
+            <View style={styles.infoRow}>
               <MaterialCommunityIcons name="email" size={16} color="#999" />
-              <Text
-                style={{
-                  fontSize: 12,
-                  color: "#666",
-                  marginLeft: 5,
-                }}
-              >
-                {item.email}
-              </Text>
+              <Text style={styles.descText}>{item.email}</Text>
             </View>
 
-            {/* Status */}
-            <View style={{ flexDirection: "row", marginBottom: 2 }}>
+            {/* Status Row */}
+            <View style={styles.infoRow}>
               <MaterialCommunityIcons
                 name={item.active ? "check-circle" : "close-circle"}
                 size={16}
-                color={item.active ? "green" : "red"}
+                color={item.active ? "#2e7d32" : "#d32f2f"}
               />
-              <Text
-                style={{
-                  fontSize: 12,
-                  color: item.active ? "green" : "red",
-                  fontWeight: "600",
-                  marginLeft: 5,
-                }}
-              >
+              <Text style={[styles.statusText, { color: item.active ? "#2e7d32" : "#d32f2f" }]}>
                 {item.active ? "Aktif" : "Tidak Aktif"}
               </Text>
             </View>
 
-            {/* Copy ID */}
-            <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <Text style={{ fontSize: 12, color: "#666", marginRight: 8 }}>
-                {item.id}
-              </Text>
-              <Pressable onPress={copyId}>
-                <MaterialCommunityIcons
-                  name="content-copy"
-                  size={18}
-                  color="#666"
-                  style={{ marginTop: -3, marginLeft: -5 }}
-                />
-              </Pressable>
-            </View>
+            {/* ID Section */}
+            <Pressable onPress={copyId} style={styles.idRow}>
+              <Text style={styles.idText}>{item.id}</Text>
+              <MaterialCommunityIcons name="content-copy" size={14} color="#999" />
+            </Pressable>
           </View>
         )}
-        descriptionNumberOfLines={6}
         right={() => (
-          <Pressable onPress={() => onEdit(item)} style={{ paddingHorizontal: 3 }}>
-            <MaterialCommunityIcons
-              name="chevron-right"
-              size={28}
-              color="#a3a1a1ff"
-            />
+          <Pressable onPress={() => onEdit(item)} style={styles.chevron}>
+            <MaterialCommunityIcons name="chevron-right" size={28} color="#ccc" />
           </Pressable>
         )}
       />
@@ -111,29 +75,32 @@ const GlobalUserItem = memo(({ item, onEdit }: any) => {
   );
 });
 
-// ================================
+// ============================================================
 // MAIN SCREEN
-// ================================
+// ============================================================
 export default function GlobalUserListScreen() {
   const router = useRouter();
   const { rootBase: rootPath, basePath } = useBasePath();
 
-  const list = useUniversalPaginatedList({
+  // Integrasi TanStack Query via Hook
+  // Definisikan tipe mode agar tidak terjadi error "name vs string"
+  const list = useUniversalPaginatedList<any, "nama" | "telp" | "email">({
     rootPath,
     basePath,
     fetchFn: getGlobalUserList,
     defaultMode: "nama",
   });
 
-  const renderItem = ({ item }: any) => (
+  // Memoized render function agar scrolling tetap halus (60 FPS)
+  const renderItem = useCallback(({ item }: any) => (
     <GlobalUserItem
       item={item}
       onEdit={(i: any) => router.push(`/global_user/edit/${i.id}`)}
     />
-  );
+  ), []);
 
   return (
-    <View style={{ flex: 1, backgroundColor: "#f9f9f9" }}>
+    <View style={styles.screen}>
       <AppHeaderList
         title="Data Global User"
         onAdd={() => router.push("/global_user/add")}
@@ -143,25 +110,26 @@ export default function GlobalUserListScreen() {
         value={list.search}
         onChangeText={list.setSearch}
         mode={list.mode}
-        onChangeMode={(m) => list.setMode(m)}
-        placeholder="Cari nama / telp..."
+        // FIX: Casting 'm' agar sesuai dengan tipe union di hook
+        onChangeMode={(m) => list.setMode(m as "nama" | "telp" | "email")}
+        placeholder="Cari nama / telp / email..."
         categories={[
           { label: "Nama", value: "nama" },
           { label: "Telp", value: "telp" },
           { label: "Email", value: "email" },
         ]}
-
       />
 
+      {/* State Loading Awal */}
       {list.loading && list.items.length === 0 && (
-        <View style={{ paddingTop: 40 }}>
+        <View style={styles.centerLoading}>
           <ActivityIndicator size="large" />
         </View>
       )}
 
       <FlatList
         data={list.items}
-        keyExtractor={(i) => i.id}
+        keyExtractor={(item) => item.id}
         renderItem={renderItem}
         refreshControl={
           <RefreshControl
@@ -169,24 +137,51 @@ export default function GlobalUserListScreen() {
             onRefresh={list.onRefresh}
           />
         }
-        onEndReachedThreshold={0.4}
         onEndReached={list.onEndReached}
+        onEndReachedThreshold={0.5}
+        contentContainerStyle={styles.listContent}
         ListEmptyComponent={
           !list.loading ? (
-            <Text style={{ textAlign: "center", marginTop: 20 }}>
-              Belum ada data Global User.
-            </Text>
+            <Text style={styles.emptyText}>Belum ada data Global User.</Text>
           ) : null
         }
         ListFooterComponent={
           list.loading && list.items.length > 0 ? (
-            <ActivityIndicator style={{ marginVertical: 20 }} />
+            <ActivityIndicator style={styles.footerLoader} />
           ) : null
         }
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
-        onScrollBeginDrag={() => Keyboard.dismiss()}
+        onScrollBeginDrag={Keyboard.dismiss}
       />
     </View>
   );
 }
+
+// ============================================================
+// STYLES
+// ============================================================
+const styles = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: "#f9f9f9" },
+  card: {
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    marginHorizontal: 12,
+    marginBottom: 12,
+    elevation: 2,
+    borderWidth: Platform.OS === "ios" ? 1 : 0,
+    borderColor: "#eee",
+  },
+  title: { fontWeight: "bold", fontSize: 16, color: "#333" },
+  descContainer: { marginTop: 4 },
+  infoRow: { flexDirection: "row", alignItems: "center", marginBottom: 4 },
+  descText: { fontSize: 13, color: "#666", marginLeft: 6 },
+  statusText: { fontSize: 13, fontWeight: "600", marginLeft: 6 },
+  idRow: { flexDirection: "row", alignItems: "center", marginTop: 2 },
+  idText: { fontSize: 11, color: "#999", marginRight: 6 },
+  chevron: { justifyContent: "center", paddingRight: 4 },
+  centerLoading: { paddingTop: 40 },
+  listContent: { paddingBottom: 100 },
+  emptyText: { textAlign: "center", marginTop: 40, color: "#999" },
+  footerLoader: { marginVertical: 20 },
+});

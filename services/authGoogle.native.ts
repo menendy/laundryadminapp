@@ -11,7 +11,7 @@ import {
 export function useGoogleAuthNative() {
   useEffect(() => {
     GoogleSignin.configure({
-      webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID!, // ✅ WAJIB
+      webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID!,
       offlineAccess: true,
       forceCodeForRefreshToken: true,
     });
@@ -23,7 +23,21 @@ export function useGoogleAuthNative() {
       showPlayServicesUpdateDialog: true,
     });
 
-    // 2️⃣ Google Sign-In
+    // ============================================================
+    // 🔥 TAMBAHAN PENTING: FORCE LOGOUT DULU
+    // ============================================================
+    // Kita lakukan signOut dulu dari Google SDK (bukan Firebase)
+    // untuk menghapus cache sesi sebelumnya.
+    // Ini akan memaksa popup "Pilih Akun" muncul kembali.
+    try {
+      await GoogleSignin.signOut();
+    } catch (error) {
+      // Abaikan error jika user memang belum login sebelumnya
+      console.log("Error signing out from Google SDK (ignored):", error);
+    }
+    // ============================================================
+
+    // 2️⃣ Google Sign-In (Sekarang dialog pilih akun akan muncul)
     const userInfo = await GoogleSignin.signIn();
 
     const idToken = userInfo.data?.idToken;

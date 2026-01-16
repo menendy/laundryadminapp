@@ -12,31 +12,6 @@ export const addAksesPengguna = async (payload: AksesPenggunaPayload) => {
 
 
 
-// ============================================================
-// 🟢 PAGE ADMIN LIST ALL
-
-// export const getPagesAdminListAll = async (): Promise<any[]> => {
-
-//   try {
-
-//     const params = new URLSearchParams();
-
-//     const res = await api.get(`/getPagesAdminListAll?${params.toString()}`);
-//     return res.data?.data ?? [];
-
-//   } catch (err) {
-//     console.error("❌ getPagesAdminListAll error:", err);
-//     return [];
-
-//   }
-// };
-
-
-// export const getPagesAdminListAll = async (rootPath: string, basePath: string) => {
-//  const res = await api.get("/getPagesAdminListAll", { params: {rootPath,basePath} });
-//  return res.data?.data ?? null;
-// };
-
 export const getPagesAdminListAll = async (
   rootPath: string,      // wajib agar sesuai dengan hook
   basePath: string,      // wajib juga

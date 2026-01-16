@@ -1,7 +1,7 @@
-// app/auth/login.tsx
 import React, { useState } from "react";
 import { View, Pressable, Text, Platform } from "react-native";
-import { Button } from "react-native-paper";
+// ✅ 1. Tambahkan import TextInput dari react-native-paper
+import { Button, TextInput } from "react-native-paper";
 import { useRouter } from "expo-router";
 
 import {
@@ -16,8 +16,6 @@ import {
   signInWithGooglePopup,
 } from "../../services/firebase.web";
 
-
-
 // NATIVE GOOGLE
 import { useGoogleAuthNative } from "../../services/authGoogle.native";
 
@@ -27,34 +25,52 @@ import { firebaseErrorMessages } from "../../services/firebase-error";
 
 import ValidatedInput from "../../components/ui/ValidatedInput";
 
+// 🔥 IMPORT QUERY CLIENT
+import { useQueryClient } from "@tanstack/react-query";
+
 export default function LoginScreen() {
   const router = useRouter();
   const showSnackbar = useSnackbarStore((s) => s.showSnackbar);
   const { signInWithGoogle } = useGoogleAuthNative();
+  
+  // 🔥 INISIALISASI QUERY CLIENT
+  const queryClient = useQueryClient();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
+  // ✅ 2. State untuk mengatur visibilitas password (default: true / tersembunyi)
+  const [isPasswordSecure, setIsPasswordSecure] = useState(true);
+
   // ============================
   // 🔐 AFTER LOGIN SUCCESS
   // ============================
   const afterLoginSuccess = async (): Promise<boolean> => {
-    const user =
-      Platform.OS === "web"
-        ? webAuth.current.currentUser
-        : getAuth().currentUser;
+    const authInstance = Platform.OS === "web" ? webAuth.current : getAuth();
+    const user = authInstance.currentUser;
 
     if (!user) {
       throw new Error("Firebase user null after login");
     }
 
     try {
+      // 1️⃣ Panggil Backend untuk set Custom Claims
       await loginUser({ uid: user.uid });
 
-      // ✅ backend OK
-      router.replace("/");
+      // ✅ FIX 1: PAKSA REFRESH TOKEN
+      await user.getIdToken(true); 
+
+      // ✅ FIX 2: STOP & BERSIHKAN TOTAL
+      await queryClient.cancelQueries(); 
+      queryClient.clear(); 
+
+      // ✅ FIX 3: NAVIGASI DENGAN JEDA
+      setTimeout(() => {
+        router.replace("/");
+      }, 500); 
+
       return true;
     } catch (err: any) {
       const data = err?.response?.data;
@@ -70,14 +86,13 @@ export default function LoginScreen() {
     }
   };
 
-
-
   // ============================
   // 🔐 LOGIN EMAIL
   // ============================
   const handleLogin = async () => {
     try {
       setLoading(true);
+      setFormError(null); // Reset error form
 
       if (Platform.OS === "web") {
         await signInWithEmailWeb(webAuth.current, email, password);
@@ -117,7 +132,6 @@ export default function LoginScreen() {
         "Tidak dapat login. Periksa email dan password Anda.";
 
       showSnackbar(message, "error");
-      //showSnackbar("Login Google gagal.", "error");
     } finally {
       setLoading(false);
     }
@@ -125,12 +139,35 @@ export default function LoginScreen() {
 
   return (
     <View style={{ padding: 20, marginTop: 60 }}>
-      <ValidatedInput label="Email" value={email} onChangeText={setEmail} />
+      {/* HEADER / LOGO JIKA ADA */}
+      <Text style={{ fontSize: 24, fontWeight: "bold", textAlign: "center", marginBottom: 30 }}>
+        Login Aplikasi
+      </Text>
+
+      <ValidatedInput 
+        label="Email" 
+        value={email} 
+        onChangeText={setEmail} 
+        autoCapitalize="none"
+        keyboardType="email-address"
+      />
+      
+      {/* ✅ 3. Update ValidatedInput Password dengan Icon Toggle */}
       <ValidatedInput
         label="Password"
-        secureTextEntry
         value={password}
         onChangeText={setPassword}
+        // Gunakan state untuk menentukan hidden/show
+        secureTextEntry={isPasswordSecure}
+        // Tambahkan tombol mata di sebelah kanan
+        right={
+          <TextInput.Icon 
+            icon={isPasswordSecure ? "eye" : "eye-off"} 
+            onPress={() => setIsPasswordSecure(!isPasswordSecure)} 
+            forceTextInputFocus={false}
+            style={{ marginRight: 25 }}
+          />
+        }
       />
 
       <Button

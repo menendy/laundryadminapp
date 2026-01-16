@@ -3,7 +3,7 @@ import { initializeApp, getApps } from "firebase/app";
 import {
   getAuth,
   signInWithEmailAndPassword,
-  signOut,
+  signOut as firebaseSignOut, // 1. 🔥 Rename import asli
   sendPasswordResetEmail as firebaseSendPasswordResetEmail,
   GoogleAuthProvider,
   signInWithPopup,
@@ -32,16 +32,24 @@ export const auth = {
 };
 
 // ===============================
-// 🔐 WRAPPER (INI KUNCI FIX)
+// 🔐 WRAPPER PASSWORD RESET
 // ===============================
 export const sendPasswordResetEmail = async (_auth: any, email: string) => {
   return firebaseSendPasswordResetEmail(getWebAuth(), email);
 };
 
 // ===============================
-// EXPORT LAIN (AMAN)
+// 🔐 EXPORT SIGN OUT (FIXED)
 // ===============================
-export { signInWithEmailAndPassword, signOut };
+// 2. 🔥 Buat Wrapper function yang menyuntikkan auth instance
+export const signOut = async () => {
+  return firebaseSignOut(getWebAuth()); 
+};
+
+// ===============================
+// EXPORT LAIN
+// ===============================
+export { signInWithEmailAndPassword };
 
 // ===============================
 // GOOGLE LOGIN (WEB ONLY)

@@ -41,17 +41,13 @@ export const signInWithGoogleNative =
 // ===============================
 // 🔄 TOKEN (SAFE, SINGLE SOURCE)
 // ===============================
-export const getFreshIdToken = async (
-  forceRefresh = false
-): Promise<string> => {
-  const user =
-    Platform.OS === "web"
+export const getFreshIdToken = async (forceRefresh = false): Promise<string> => {
+  const user = Platform.OS === "web"
       ? firebase.auth?.currentUser
       : getAuth().currentUser;
 
-  if (!user) {
-    throw new Error("Firebase user is null");
-  }
+  if (!user) throw new Error("Firebase user is null");
 
-  return user.(forceRefresh);
+  // ✅ Tambahkan getIdToken
+  return user.getIdToken(forceRefresh); 
 };

@@ -10,15 +10,28 @@ import { MaterialIcons } from "@expo/vector-icons";
 import { useRouter, usePathname } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-export default function BottomNav({ onMenuPress, onMenuClose, isDrawerOpen }) {
+// ✅ 1. Definisikan Interface untuk Props
+interface BottomNavProps {
+  onMenuPress: () => void;
+  onMenuClose?: () => void; // Optional karena di logic ada pengecekan if (onMenuClose)
+  isDrawerOpen: boolean;
+}
+
+// ✅ 2. Terapkan Interface ke Komponen
+export default function BottomNav({ 
+  onMenuPress, 
+  onMenuClose, 
+  isDrawerOpen 
+}: BottomNavProps) {
+  
   const router = useRouter();
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
-  const { width, height } = useWindowDimensions(); // <-- reactive
+  const { width, height } = useWindowDimensions();
   const isWeb = Platform.OS === "web";
   const isOverlayMode = width < 1200;
 
-  // Hitung posisi tombol tengah secara adaptif (tetap seperti sebelumnya)
+  // Hitung posisi tombol tengah secara adaptif
   const getAdaptiveMarginBottom = () => {
     if (Platform.OS === "android") {
       if (height < 700) return Math.max(insets.bottom - 4, 0);
@@ -32,14 +45,8 @@ export default function BottomNav({ onMenuPress, onMenuClose, isDrawerOpen }) {
 
   const adaptiveMarginBottom = getAdaptiveMarginBottom();
 
-  // NAV helper:
-  // - Jika web & lebar >= 768 => jangan tutup drawer saat navigasi
-  // - Jika mobile atau web sempit => tutup drawer setelah navigasi
-  const navigateAndMaybeClose = (path: string) => {
-    // First navigate (kehilangan atau delay kecil di SPA tidak masalah)
+  const navigateAndMaybeClose = (path: any) => {
     router.push(path);
-
-    // kemudian close jika diperlukan
     const shouldAutoClose = isOverlayMode;
     if (shouldAutoClose && onMenuClose) {
       onMenuClose();

@@ -6,7 +6,8 @@
     
     "android": {
       "package": "com.anonymous.laundryadminapp",
-      "googleServicesFile": "./google-services.json"
+      "googleServicesFile": "./google-services.json",
+      "softwareKeyboardLayoutMode": "resize"
     },
     "plugins": [
       [

@@ -1,5 +1,4 @@
-// C:\Users\WIN10\laundryadminapp\app\_layout.tsx
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo, useCallback, memo, useRef } from "react";
 import {
   View,
   Platform,
@@ -7,11 +6,21 @@ import {
   Animated,
   Text,
   Pressable,
+  StyleSheet,
+  ActivityIndicator,
 } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { MD3LightTheme as DefaultTheme, PaperProvider } from "react-native-paper";
+import { MD3LightTheme as DefaultTheme, PaperProvider, Portal } from "react-native-paper";
 import { Stack, useSegments } from "expo-router";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+
+// === TANSTACK QUERY IMPORTS ===
+import {
+  QueryClient,
+  QueryClientProvider,
+  useQuery,
+  QueryCache,
+} from "@tanstack/react-query";
 
 import DrawerMenu from "../components/layout/DrawerMenu";
 import BottomNav from "../components/layout/BottomNav";
@@ -21,14 +30,33 @@ import OfflineBanner from "../components/ui/OfflineBanner";
 import { useSnackbarStore } from "../store/useSnackbarStore";
 import { useAuthStore } from "../store/useAuthStore";
 import { initAuthTokenListener } from "../services/authTokenListener";
+import { handleBackendError } from "../utils/handleBackendError";
 
-// === IMPORTS UNTUK DYNAMIC MENU ===
 import { getPagesAdminList2 } from "../services/api/pagesAdminService2";
-import { transformMenuData, DrawerMenuItem } from "../utils/menuHelper";
+import { transformMenuData } from "../utils/menuHelper";
+import { useBasePath } from "../utils/useBasePath";
 
-// =========================
-// THEME
-// =========================
+// =========================================================
+// 1. GLOBAL ERROR & QUERY CLIENT CONFIG
+// =========================================================
+const queryClient = new QueryClient({
+  queryCache: new QueryCache({
+    onError: (error) => {
+      console.error("Global Query Error:", error);
+    },
+  }),
+  defaultOptions: {
+    queries: {
+      // Config Global untuk query lain (seperti list data)
+      staleTime: 1000 * 60 * 5, // 5 Menit
+      gcTime: 1000 * 60 * 5,
+      networkMode: "online",
+      retry: 0,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
+
 const theme = {
   ...DefaultTheme,
   roundness: 10,
@@ -41,37 +69,33 @@ const theme = {
   },
 };
 
+const MemoizedDrawerMenu = memo(DrawerMenu);
+const MemoizedBottomNav = memo(BottomNav);
+
 /**
- * =========================================================
  * AppInitializer
- * =========================================================
  */
 function AppInitializer({ children }: { children: React.ReactNode }) {
   const hydrate = useAuthStore((s) => s.hydrate);
   const isHydrated = useAuthStore((s) => s.isHydrated);
 
-  // 1️⃣ Hydrate store (WAJIB, 1x)
   useEffect(() => {
     hydrate();
   }, []);
 
-  // 2️⃣ Firebase auth token listener (SETELAH hydrate)
   useEffect(() => {
     if (!isHydrated) return;
-
     const unsubscribe = initAuthTokenListener();
-
     return () => {
-      if (typeof unsubscribe === "function") {
-        unsubscribe();
-      }
+      if (typeof unsubscribe === "function") unsubscribe();
     };
   }, [isHydrated]);
 
   if (!isHydrated) {
     return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-        <Text>Loading...</Text>
+      <View style={styles.center}>
+        <ActivityIndicator size="large" color="#1976d2" />
+        <Text style={{ marginTop: 10 }}>Menghubungkan ke Server...</Text>
       </View>
     );
   }
@@ -83,12 +107,21 @@ function AppInitializer({ children }: { children: React.ReactNode }) {
 // ROOT LAYOUT
 // =========================================================
 export default function Layout() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <RootLayoutContent />
+    </QueryClientProvider>
+  );
+}
+
+function RootLayoutContent() {
   const { width } = useWindowDimensions();
   const snackbar = useSnackbarStore();
   const isWeb = Platform.OS === "web";
   const segments = useSegments();
+  const isHydrated = useAuthStore((s) => s.isHydrated);
 
-  // Breakpoints
+  // Responsivitas Breakpoints
   const isMobile = width < 600;
   const isTabletPortrait = width >= 600 && width < 840;
   const isTabletLandscape = width >= 840 && width < 1200;
@@ -97,190 +130,154 @@ export default function Layout() {
 
   const isOverlay = isMobile || isTabletPortrait;
   const isDocked = isTabletLandscape || isDesktop || isUltraWide;
+  const { rootBase: rootPath, basePath } = useBasePath();
 
-  const [isDrawerOpen, setDrawerOpen] = React.useState(isDocked);
-  const [drawerWidth, setDrawerWidth] = React.useState(280);
-  const slideAnim = React.useRef(
-    new Animated.Value(isDocked ? 0 : -drawerWidth)
-  ).current;
-  const [openMapVersion, setOpenMapVersion] = React.useState(0);
+  // ============================================================
+  // 3. FETCH MENU DENGAN TANSTACK QUERY & HANDLE ERROR
+  // ============================================================
+  const { data: menuItems = [] } = useQuery({
+    // 🔥 PERUBAHAN UTAMA: KEY STATIS
+    // Gunakan string tetap. Jangan masukkan rootPath/basePath ke dalam Key.
+    // Ini membuat React Query menganggap semua halaman menggunakan data cache yang SAMA.
+    queryKey: ["admin-menu-global"], 
+    
+    queryFn: async () => {
+      const response = await getPagesAdminList2(rootPath, basePath);
+      const ok = handleBackendError(response as any, () => {}, snackbar.showSnackbar);
+      if (!ok) throw new Error(response.message || "Gagal memuat menu");
+      return response.data;
+    },
+    select: (data) => transformMenuData(data),
+    enabled: isHydrated, // Hanya jalan kalau token sudah siap
 
-  // === STATE BARU: MENU ITEMS DARI API ===
-  const [menuItems, setMenuItems] = useState<DrawerMenuItem[]>([]);
+    // 🔥 CONFIG "JANGAN PERNAH FETCH LAGI"
+    staleTime: Infinity,        // Data dianggap fresh selamanya
+    gcTime: Infinity,           // Jangan pernah dihapus dari memori
+    refetchOnMount: false,      // Jangan fetch saat component mount ulang
+    refetchOnWindowFocus: false, // Jangan fetch saat pindah tab
+    refetchOnReconnect: false,   // Jangan fetch saat internet nyala lagi
+  });
+  // ============================================================
 
-  // === FETCH MENU DATA ===
-  useEffect(() => {
-    const fetchMenu = async () => {
-      try {
-        const response = await getPagesAdminList2();
-        if (response.success && response.data) {
-          // Transform data flat -> tree
-          const tree = transformMenuData(response.data);
-          setMenuItems(tree);
-        } else {
-          console.warn("Gagal mengambil data menu");
-        }
-      } catch (err) {
-        console.error("Error fetch menu:", err);
-      }
-    };
+  const [isDrawerOpen, setDrawerOpen] = useState(isDocked);
+  const [drawerWidth, setDrawerWidth] = useState(280);
+  const [openMapVersion, setOpenMapVersion] = useState(0);
 
-    fetchMenu();
-  }, []);
+  const dynamicDrawerWidth = isDocked ? drawerWidth : width;
+  const slideAnim = useRef(new Animated.Value(isDocked ? 0 : -dynamicDrawerWidth)).current;
 
-  // Drawer responsiveness
+const hideBottomNav = useMemo(() => {
+    
+    
+    // Sembunyikan BottomNav saat di halaman "Edit Outlet"
+    // (URL mengandung "profil" DAN "editOutlet")
+    const isEditOutlet = segments.includes("profil") && segments.includes("editOutlet");
+
+    // Return TRUE jika salah satu kondisi terpenuhi
+    return  isEditOutlet;
+  }, [segments]);
+
   useEffect(() => {
     if (isDocked) {
       setDrawerOpen(true);
       slideAnim.setValue(0);
     } else {
-      setDrawerOpen(false);
-      slideAnim.setValue(-drawerWidth);
+      if (!isDrawerOpen) slideAnim.setValue(-width);
     }
-  }, [isOverlay, isDocked, width]);
+  }, [isDocked, width]);
 
-  const openDrawer = () => {
+  const openDrawer = useCallback(() => {
+    if (isDocked) return;
     setDrawerOpen(true);
     Animated.timing(slideAnim, {
       toValue: 0,
-      duration: 150,
-      useNativeDriver: Platform.OS !== "web",
-    }).start();
-  };
-
-  const closeDrawer = () => {
-    Animated.timing(slideAnim, {
-      toValue: -drawerWidth,
       duration: 250,
-      useNativeDriver: Platform.OS !== "web",
-    }).start(() => setDrawerOpen(false));
-  };
+      useNativeDriver: !isWeb,
+    }).start();
+  }, [isDocked, isWeb]);
 
-  // Hide bottom nav on certain routes
-  const hideBottomNav =
-    segments.includes("pages_admin") && segments.includes("add");
+  const closeDrawer = useCallback(() => {
+    if (isDocked) return;
+    Animated.timing(slideAnim, {
+      toValue: -width,
+      duration: 250,
+      useNativeDriver: !isWeb,
+    }).start(() => setDrawerOpen(false));
+  }, [isDocked, width, isWeb]);
+
+  const handleMenuTreeChange = useCallback(() => {
+    setOpenMapVersion((prev) => prev + 1);
+  }, []);
 
   return (
     <SafeAreaProvider>
       <PaperProvider theme={theme}>
         <GestureHandlerRootView style={{ flex: 1 }}>
           <OfflineBanner />
-
-          {/* HYDRATION WRAPPER */}
           <AppInitializer>
-            {/* Handler Tap-to-dismiss for info-blocking */}
-            {snackbar.visible && snackbar.type === "info-blocking" && (
-              <Pressable
-                style={{
-                  position: "absolute",
-                  top: 0,
-                  bottom: 0,
-                  left: 0,
-                  right: 0,
-                  zIndex: 999998,
-                }}
-                onPress={snackbar.hideSnackbar}
-              />
-            )}
+            <Portal>
+              {snackbar.visible && snackbar.type === "info-blocking" && (
+                <Pressable style={styles.snackbarOverlay} onPress={snackbar.hideSnackbar} />
+              )}
 
-            <AlertSnackbar
-              visible={snackbar.visible}
-              message={snackbar.message}
-              onDismiss={snackbar.hideSnackbar}
-              type={snackbar.type}
-            />
+              <AlertSnackbar
+                visible={snackbar.visible}
+                message={snackbar.message}
+                onDismiss={snackbar.hideSnackbar}
+                type={snackbar.type}
+              />
+            </Portal>
 
             <View style={{ flex: 1, backgroundColor: "#f6f7f8" }}>
-              {/* Hidden drawer width calc (WEB DOCKED) */}
               {isWeb && isDocked && (
                 <View
                   key={openMapVersion}
-                  style={{ position: "absolute", left: -9999, opacity: 0 }}
+                  style={styles.hiddenMeasure}
                   onLayout={(e) => {
                     const w = e.nativeEvent.layout.width;
                     if (drawerWidth !== w) setDrawerWidth(w);
                   }}
                 >
-                  <DrawerMenu
+                  <MemoizedDrawerMenu
                     menuItems={menuItems}
                     onClose={() => {}}
-                    onMenuTreeChange={() => setOpenMapVersion((prev) => prev + 1)}
+                    onMenuTreeChange={handleMenuTreeChange}
                   />
                 </View>
               )}
 
-              {/* ACTIVE DRAWER (VISIBLE OR SLIDING) */}
               {(isDrawerOpen || isDocked) && (
-                <>
-                  {isOverlay && (
-                    <View
-                      onTouchEnd={closeDrawer}
-                      style={{
-                        position: "absolute",
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                        backgroundColor: "rgba(0,0,0,0.25)",
-                        zIndex: 98,
-                      }}
-                    />
-                  )}
-
-                  <Animated.View
-                    style={{
-                      position: "absolute",
-                      top: 0,
-                      left: 0,
-                      bottom: 0,
-                      width: isDocked ? drawerWidth : width,
-                      backgroundColor: "#fff",
-                      borderRightWidth: isDocked ? 1 : 0,
-                      borderRightColor: "#e0e0e0",
-                      zIndex: 99,
+                <Animated.View
+                  style={[
+                    styles.drawerContainer,
+                    {
+                      width: dynamicDrawerWidth,
                       transform: [{ translateX: slideAnim }],
-                    }}
-                  >
-                    <DrawerMenu
-                      menuItems={menuItems}
-                      onClose={closeDrawer}
-                      onMenuTreeChange={() =>
-                        setOpenMapVersion((prev) => prev + 1)
-                      }
-                    />
-                  </Animated.View>
-                </>
+                      zIndex: isOverlay ? 1000 : 99,
+                    },
+                  ]}
+                >
+                  <MemoizedDrawerMenu
+                    menuItems={menuItems}
+                    onClose={closeDrawer}
+                    onMenuTreeChange={handleMenuTreeChange}
+                  />
+                </Animated.View>
               )}
 
-              {/* CONTENT AREA (STACK) - SEKARANG FLEKSIBEL */}
-              <Animated.View
+              <View
                 style={{
                   flex: 1,
                   backgroundColor: "#f6f7f8",
-                  marginLeft: isDocked
-                    ? slideAnim.interpolate({
-                        inputRange: [-drawerWidth, 0],
-                        outputRange: [0, drawerWidth],
-                        extrapolate: "clamp",
-                      })
-                    : 0,
-                  // transition properti dihapus agar animasi JS berjalan mulus
+                  marginLeft: isDocked ? drawerWidth : 0,
                 }}
               >
                 <Stack screenOptions={{ headerShown: false }} />
-              </Animated.View>
+              </View>
 
               {!hideBottomNav && (
-                <View
-                  style={{
-                    position: "absolute",
-                    bottom: 0,
-                    left: 0,
-                    right: 0,
-                    zIndex: 100,
-                  }}
-                >
-                  <BottomNav
+                <View style={styles.bottomNavWrapper}>
+                  <MemoizedBottomNav
                     onMenuPress={openDrawer}
                     onMenuClose={closeDrawer}
                     isDrawerOpen={isDrawerOpen}
@@ -294,3 +291,25 @@ export default function Layout() {
     </SafeAreaProvider>
   );
 }
+
+const styles = StyleSheet.create({
+  center: { flex: 1, justifyContent: "center", alignItems: "center" },
+  snackbarOverlay: { position: "absolute", top: 0, bottom: 0, left: 0, right: 0, zIndex: 999998 },
+  hiddenMeasure: { position: "absolute", left: -9999, opacity: 0 },
+  drawerContainer: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    bottom: 0,
+    backgroundColor: "#fff",
+    borderRightWidth: 1,
+    borderRightColor: "#e0e0e0",
+  },
+  bottomNavWrapper: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    zIndex: 1001,
+  },
+});

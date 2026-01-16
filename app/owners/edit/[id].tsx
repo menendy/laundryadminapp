@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import { View, StyleSheet, ScrollView } from "react-native";
 import { ActivityIndicator, List } from "react-native-paper";
-import { useRouter, useGlobalSearchParams } from "expo-router";
+import { useRouter, useGlobalSearchParams, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import AppHeaderActions from "../../../components/ui/AppHeaderActions";
@@ -60,31 +60,61 @@ export default function EditOwnerScreen() {
     email: "",
   });
 
-  /* ================= LOAD DATA ================= */
+  /* ================= LOAD DATA (WITH FOCUS GUARD & PARAMETER GUARD) ================= */
 
-  const loadData = async () => {
-    try {
-      const res = await getOwnerById(String(id), rootPath, basePath);
+  /**
+   * ✅ STRATEGI: Menggunakan useFocusEffect + Parameter Guard.
+   * Mencegah pemanggilan API ulang jika user baru saja kembali dari Modal Edit.
+   */
+  useFocusEffect(
+    useCallback(() => {
+      // 🔥 GUARD 1: Jika terdeteksi ada parameter update dari modal, JANGAN jalankan fetch ulang.
+      // Ini mencegah loading spinner muncul dan mencegah data lokal tertimpa data lama server.
+      if (params.updatedField) return;
 
-      setData({
-        name: res.name,
-        phone: res.phone?.replace(/^(\+62|62)/, "") ?? "",
-        email: res.email,
-      });
+      let isMounted = true;
 
-      setActive(res.active);
-    } catch (err) {
-      handleBackendError(err, setErrors, showSnackbar);
-    } finally {
-      setLoading(false);
-    }
-  };
+      const loadData = async () => {
+        if (!id) return;
 
-  useEffect(() => {
-    if (id) loadData();
-  }, [id]);
+        // 🔥 GUARD 2: Hanya tampilkan spinner jika data benar-benar masih kosong (First Load).
+        if (!data.name) {
+          setLoading(true);
+        }
 
-  /* ================= REALTIME UPDATE FROM MODAL ================= */
+        try {
+          const res = await getOwnerById(String(id), rootPath, basePath);
+          
+          if (isMounted) {
+            setData({
+              name: res.name,
+              phone: res.phone?.replace(/^(\+62|62)/, "") ?? "",
+              email: res.email,
+            });
+            setActive(res.active);
+            setPendingActive(res.active);
+          }
+        } catch (err) {
+          if (isMounted) {
+            handleBackendError(err, setErrors, showSnackbar);
+          }
+        } finally {
+          if (isMounted) {
+            setLoading(false);
+          }
+        }
+      };
+
+      loadData();
+
+      return () => {
+        isMounted = false; // Cleanup: matikan update state jika pindah screen
+      };
+      // Masukkan updatedField ke dependency agar useCallback peka terhadap perubahan status update
+    }, [id, rootPath, basePath, params.updatedField]) 
+  );
+
+  /* ================= REALTIME UPDATE SYNC ================= */
 
   useEffect(() => {
     if (!params.updatedField) return;
@@ -92,11 +122,14 @@ export default function EditOwnerScreen() {
     const f = params.updatedField;
     const v = params.updatedValue ?? "";
 
+    // Update state secara lokal agar UI berubah seketika tanpa menunggu API
     if (f === "name") setData((p) => ({ ...p, name: v }));
-    if (f === "phone") setData((p) => ({ ...p, phone: v }));
+    if (f === "phone") setData((p) => ({ ...p, phone: v.replace(/^(\+62|62)/, "") }));
     if (f === "email") setData((p) => ({ ...p, email: v }));
     if (f === "active") setActive(v === "true" || v === "1");
 
+    // ✅ PENTING: Bersihkan params agar Parameter Guard di useFocusEffect 
+    // bisa terbuka kembali jika user benar-benar keluar-masuk halaman ini lagi.
     router.setParams({
       updatedField: undefined,
       updatedValue: undefined,
@@ -113,6 +146,7 @@ export default function EditOwnerScreen() {
 
   const handleUpdateStatus = async (value: boolean) => {
     try {
+      setSaving(true);
       const res = await updateOwner(String(id), {
         active: value,
         rootPath,
@@ -127,31 +161,38 @@ export default function EditOwnerScreen() {
     } catch (err) {
       handleBackendError(err, setErrors, showSnackbar);
       return false;
+    } finally {
+      setSaving(false);
     }
   };
 
-  /* ================= UI ================= */
+  const handleDelete = async () => {
+    try {
+      setSaving(true);
+      const res = await deleteOwner(String(id), { rootPath, basePath });
+      const ok = handleBackendError(res, setErrors, showSnackbar);
+      if (!ok) return false;
+
+      showSnackbar("Berhasil dihapus", "success");
+      router.replace("/owners"); 
+      return true;
+    } catch (err) {
+      handleBackendError(err, setErrors, showSnackbar);
+      return false;
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  /* ================= UI RENDERING ================= */
 
   if (loading) {
     return (
-      <View style={{ flex: 1, justifyContent: "center" }}>
-        <ActivityIndicator size="large" />
+      <View style={styles.loaderContainer}>
+        <ActivityIndicator size="large" color="#1976d2" />
       </View>
     );
   }
-
-   const handleDelete = async () => {
-          try {
-            setSaving(true);
-            const res = await deleteOwner(String(id), { rootPath, basePath });
-            const ok = handleBackendError(res, setErrors, showSnackbar);
-            if (!ok) return false;
-            showSnackbar("Berhasil dihapus", "success");
-            return true;
-          } finally {
-            setSaving(false);
-          }
-        };
 
   return (
     <View style={styles.container}>
@@ -160,17 +201,17 @@ export default function EditOwnerScreen() {
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}
+        showsVerticalScrollIndicator={false}
       >
         <ConfirmBottomSheet
           visible={confirmVisible}
           title={pendingActive ? "Aktifkan Akun Owner?" : "Nonaktifkan Akun Owner?"}
           message={
             pendingActive
-              ? "Akun owner akan diaktifkan dan dapat mengakses sistem."
-              : "Akun owner akan dinonaktifkan dan tidak dapat login."
+              ? "Akun owner akan diaktifkan dan dapat mengakses sistem kembali."
+              : "Akun owner akan dinonaktifkan dan tidak akan bisa melakukan login."
           }
           confirmText="Ya, Lanjutkan"
-          cancelText="Batal"
           onConfirm={async () => {
             setConfirmVisible(false);
             const ok = await handleUpdateStatus(pendingActive);
@@ -179,46 +220,15 @@ export default function EditOwnerScreen() {
           onCancel={() => setConfirmVisible(false)}
         />
 
-
-
         <ConfirmBottomSheet
           visible={confirmDeleteVisible}
           title="Hapus Pengguna?"
-          message="Apakah Anda yakin ingin menghapus pengguna ini?"
+          message="Apakah Anda yakin ingin menghapus data owner ini secara permanen?"
           confirmText="Ya, Hapus"
-          cancelText="Batal"
-          onConfirm={async () => {
-            setConfirmDeleteVisible(false);
-
-            const prev = active; // simpan state lama untuk rollback jika perlu
-            try {
-              setSaving(true);
-
-              // panggil API delete
-              const ok = await handleDelete();
-              if (!ok) {
-                setActive(prev); // rollback UI kalau gagal
-                return;
-              }
-
-              showSnackbar("Berhasil dihapus", "success");
-
-              // kembali ke halaman daftar
-              router.replace("/owners");
-            } catch (err) {
-              handleBackendError(err, setErrors, showSnackbar);
-              setActive(prev);
-            } finally {
-              setSaving(false);
-            }
-          }}
-
-          onCancel={() => {
-            setConfirmDeleteVisible(false);
-          }}
+          onConfirm={handleDelete}
+          onCancel={() => setConfirmDeleteVisible(false)}
         />
 
-        {/* === SECTION 1: STATUS === */}
         <SectionListCard
           style={{ marginTop: 16 }}
           title="Status Akun Owner"
@@ -240,32 +250,20 @@ export default function EditOwnerScreen() {
           ]}
         />
 
-        {/* === SECTION 2: DATA OWNER === */}
         <SectionListCard
           title="Data Owner"
           items={[
-            {
-              label: "Nama Owner",
-              value: data.name || "Atur Sekarang",
-              right: () => <List.Icon icon="chevron-right" />,
-              onPress: () => goEdit("name", "Nama Owner", data.name),
-            },
-            {
-              label: "Nomor Telepon",
-              value: data.phone ? `+62${data.phone}` : "Atur Sekarang",
-              right: () => <List.Icon icon="chevron-right" />,
-              onPress: () => goEdit("phone", "Nomor Telepon", data.phone),
-            },
-            {
-              label: "Email",
-              value: data.email || "Atur Sekarang",
-              right: () => <List.Icon icon="chevron-right" />,
-              onPress: () => goEdit("email", "Email", data.email),
-            },
-          ]}
+            { label: "Nama Owner", field: "name", value: data.name },
+            { label: "Nomor Telepon", field: "phone", value: data.phone ? `+62${data.phone}` : "" },
+            { label: "Email", field: "email", value: data.email },
+          ].map((item) => ({
+            label: item.label,
+            value: item.value || "Atur Sekarang",
+            right: () => <List.Icon icon="chevron-right" />,
+            onPress: () => goEdit(item.field, item.label, (data as any)[item.field]),
+          }))}
         />
 
-        {/* === DELETE === */}
         <SectionListCard
           title=""
           items={[
@@ -278,33 +276,27 @@ export default function EditOwnerScreen() {
             },
           ]}
         />
-
-
       </ScrollView>
 
-       {saving && (
-                      <View style={styles.loadingOverlay}>
-                          <ActivityIndicator size="large" color="#fff" />
-                      </View>
-                  )}
+      {saving && (
+        <View style={styles.loadingOverlay}>
+          <ActivityIndicator size="large" color="#fff" />
+        </View>
+      )}
     </View>
   );
 }
 
-/* ================= STYLES ================= */
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: "#F4F4F4" },
-    scroll: { flex: 1 },
-    loadingOverlay: {
-        position: "absolute",
-        top: 0,
-        bottom: 0,
-        left: 0,
-        right: 0,
-        backgroundColor: "rgba(0,0,0,0.4)",
-        justifyContent: "center",
-        alignItems: "center",
-        zIndex: 999,
-    },
+  container: { flex: 1, backgroundColor: "#F4F4F4" },
+  scroll: { flex: 1 },
+  loaderContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
+  loadingOverlay: {
+    position: "absolute",
+    top: 0, bottom: 0, left: 0, right: 0,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 999,
+  },
 });
-

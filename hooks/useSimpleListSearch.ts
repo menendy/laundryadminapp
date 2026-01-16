@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from "react";
+import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useSnackbarStore } from "../store/useSnackbarStore";
 import { handleBackendError } from "../utils/handleBackendError";
 
@@ -16,98 +17,68 @@ interface SimpleListOptions<T> {
     basePath: string,
     search: string | null,
     cursor: string | null,
-    limit: number,
+    limit: number
   ) => Promise<FetchResult<T>>;
 }
 
 export function useSimpleListSearch<T>({
-  rootPath,
-  basePath,
+  rootPath: initialRootPath,
+  basePath: initialBasePath,
   fetchFn,
   limit = 25,
 }: SimpleListOptions<T>) {
-
+  const queryClient = useQueryClient();
   const showSnackbar = useSnackbarStore((s) => s.showSnackbar);
 
-  const [items, setItems] = useState<T[]>([]);
+  // ✅ KUNCI PATH: Agar logic tidak bocor saat navigasi
+  const lockedRootPath = useRef(initialRootPath).current;
+  const lockedBasePath = useRef(initialBasePath).current;
+
   const [search, setSearch] = useState("");
-  const [cursor, setCursor] = useState<string | null>(null);
-  const [hasMore, setHasMore] = useState(true);
-  const [loading, setLoading] = useState(false);
+  const [debouncedSearch, setDebouncedSearch] = useState("");
 
-  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const fetchLock = useRef(false);
+  // ✅ Search Debounce (350ms sesuai standar asli Anda)
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 350);
+    return () => clearTimeout(handler);
+  }, [search]);
 
-  const loadData = async (
-    reset: boolean,
-    keyword: string,
-    passedCursor: string | null
-  ) => {
-    if (fetchLock.current) return;
-    fetchLock.current = true;
-    setLoading(true);
+  // ✅ Query Key stabil (Modul + Keyword Search)
+  const queryKey = [lockedBasePath, "simple-list", debouncedSearch];
 
-    try {
+  const query = useInfiniteQuery({
+    queryKey: queryKey,
+    queryFn: async ({ pageParam }) => {
       const result = await fetchFn(
-        rootPath,
-        basePath,
-        keyword.trim() || null,
-        reset ? null : passedCursor,
+        lockedRootPath,
+        lockedBasePath,
+        debouncedSearch.trim() || null,
+        pageParam as string | null,
         limit
       );
 
+      // ✅ Penanganan Error Global
       const ok = handleBackendError(result as any, () => {}, showSnackbar);
-      if (!ok) {
-        if (reset) setItems([]);
-        fetchLock.current = false;
-        return;
-      }
+      if (!ok) throw new Error("Gagal memuat data");
 
-      const data = result.data ?? [];
+      return result;
+    },
+    initialPageParam: null as string | null,
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+    enabled: !!lockedBasePath,
+    
+    // ✅ Dashboard logic: Data dianggap basi & dibuang saat unmount
+    staleTime: 0,
+    gcTime: 0,
+    retry: 0,
+  });
 
-      setItems((prev) => (reset ? data : [...prev, ...data]));
-      setCursor(result.nextCursor ?? null);
-      setHasMore(result.nextCursor !== null);
-
-    } catch (err: any) {
-      showSnackbar(
-        err?.response?.data?.message ||
-        err?.message ||
-        "Gagal memuat data",
-        "error"
-      );
-
-    } finally {
-      setLoading(false);
-      fetchLock.current = false;
-    }
-  };
-
-  // ⏳ First load
-  useEffect(() => {
-    loadData(true, search, null);
-  }, []);
-
-  // 🔍 Search debounce
-  useEffect(() => {
-    if (debounceTimer.current) clearTimeout(debounceTimer.current);
-
-    debounceTimer.current = setTimeout(() => {
-      setCursor(null);
-      setHasMore(true);
-      loadData(true, search, null);
-    }, 350);
-
-    return () => {
-      if (debounceTimer.current) clearTimeout(debounceTimer.current);
-    };
-  }, [search]);
-
-  // ⏬ Load more (pagination)
-  const loadMore = async () => {
-    if (!hasMore || loading) return;
-    await loadData(false, search, cursor);
-  };
+  // ✅ Transform data dari pages menjadi satu array flat
+  const items = useMemo(() => {
+    return query.data?.pages.flatMap((page) => page.data) ?? [];
+  }, [query.data]);
 
   const clearSearch = () => setSearch("");
 
@@ -116,9 +87,22 @@ export function useSimpleListSearch<T>({
     search,
     setSearch,
     clearSearch,
-    loading,
-    loadMore,
-    hasMore,
-    reload: () => loadData(true, search, null),
+    // Status Loading (First load atau fetching next page)
+    loading: query.isLoading || query.isFetchingNextPage,
+    // Status untuk Refresh (Pull-to-refresh)
+    refreshing: query.isRefetching && !query.isFetchingNextPage,
+    hasMore: !!query.hasNextPage,
+    
+    // ✅ Load More logic
+    loadMore: () => {
+      if (query.hasNextPage && !query.isFetchingNextPage) {
+        query.fetchNextPage();
+      }
+    },
+
+    // ✅ Reload/Reset logic
+    reload: () => queryClient.resetQueries({ queryKey }),
+    
+    error: query.error,
   };
 }

@@ -1,6 +1,6 @@
 // app/profil/index.tsx
 import React, { useEffect, useState } from "react";
-import { View, TouchableOpacity, StyleSheet } from "react-native";
+import { View, TouchableOpacity, StyleSheet, Dimensions, ScrollView } from "react-native"; 
 import { Text, Avatar, List } from "react-native-paper";
 import { useRouter, useGlobalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -10,8 +10,6 @@ import { handleBackendError } from "../../utils/handleBackendError";
 import { useSnackbarStore } from "../../store/useSnackbarStore";
 import { useAuthStore } from "../../store/useAuthStore";
 import { useBasePath } from "../../utils/useBasePath";
-
-// ✅ SATU-SATUNYA CARA LOGOUT
 import { signOut } from "../../services/firebase";
 
 interface RightValueProps {
@@ -28,12 +26,12 @@ export default function ProfilAkun() {
   const router = useRouter();
   const params = useGlobalSearchParams<ProfileParams>();
   const showSnackbar = useSnackbarStore((s) => s.showSnackbar);
-  const insets = useSafeAreaInsets();
+  const insets = useSafeAreaInsets(); // ✅ Mengambil data safe area (notch/status bar)
 
-  // 🔥 SAMA DENGAN KARYAWAN
   const { rootBase: rootPath, basePath } = useBasePath();
 
   const [profile, setProfile] = useState<any>({
+    uid: "",
     name: "-",
     email: "",
     phone: "",
@@ -45,18 +43,8 @@ export default function ProfilAkun() {
     address: "",
   });
 
-  /* =========================
-     UTIL
-  ========================== */
-
   const getInitials = (fullName: string) =>
-    fullName
-      ?.trim()
-      .split(" ")
-      .map((p) => p[0])
-      .join("")
-      .slice(0, 2)
-      .toUpperCase() || "?";
+    fullName?.trim().split(" ").map((p) => p[0]).join("").slice(0, 2).toUpperCase() || "?";
 
   const maskEmail = (email: string) => {
     if (!email) return "";
@@ -71,78 +59,65 @@ export default function ProfilAkun() {
     return "*".repeat(len - 2) + phone.slice(len - 2);
   };
 
-  const RightValue: React.FC<RightValueProps> = ({
-    text,
-    warning = false,
-  }) => (
+  const formatDateID = (dateString: string) => {
+    if (!dateString) return "";
+    const parts = dateString.split("-");
+    if (parts.length !== 3) return dateString;
+    const monthNames = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+    return `${parts[2]} ${monthNames[parseInt(parts[1], 10) - 1] || parts[1]} ${parts[0]}`;
+  };
+
+  const RightValue: React.FC<RightValueProps> = ({ text, warning = false }) => (
     <View style={styles.rightContainer}>
-      <Text style={warning ? styles.rightTextWarning : styles.rightText}>
+      <Text 
+        numberOfLines={1} 
+        ellipsizeMode="tail"
+        style={[warning ? styles.rightTextWarning : styles.rightText, { maxWidth: Dimensions.get('window').width * 0.4 }]}
+      >
         {text}
       </Text>
       <List.Icon icon="chevron-right" />
     </View>
   );
 
-  /* =========================
-     LOAD PROFILE (ONCE)
-  ========================== */
-
   useEffect(() => {
     const load = async () => {
       const res = await getUserProfile();
       const success = handleBackendError(res, () => {}, showSnackbar);
       if (!success) return;
-
       if (res.profile) {
         setProfile({
           ...res.profile,
+          address: res.profile.alamat, 
           outlet_default: res.outlet_default ?? null,
         });
       }
     };
-
     load();
   }, []);
 
-  /* =========================
-     REALTIME UPDATE (SAMA POLA KARYAWAN)
-  ========================== */
-
   useEffect(() => {
     if (!params.updatedField) return;
-
     const f = params.updatedField;
     const v = params.updatedValue ?? "";
-
-    if (f === "name") setProfile((p: any) => ({ ...p, name: v }));
-    if (f === "phone") setProfile((p: any) => ({ ...p, phone: v }));
-    if (f === "email") setProfile((p: any) => ({ ...p, email: v }));
-    if (f === "address") setProfile((p: any) => ({ ...p, address: v }));
-    if (f === "gender") setProfile((p: any) => ({ ...p, gender: v }));
-    if (f === "birthday") setProfile((p: any) => ({ ...p, birthday: v }));
-
+    const fields: any = { name: 'name', phone: 'phone', email: 'email', address: 'address', gender: 'gender', birthday: 'birthday' };
+    if (fields[f]) setProfile((p: any) => ({ ...p, [fields[f]]: v }));
     if (f === "outlet_default") {
-      try {
-        const outlet = JSON.parse(v);
-        setProfile((p: any) => ({ ...p, outlet_default: outlet }));
-      } catch {
-        console.warn("Invalid outlet_default param");
-      }
+      try { setProfile((p: any) => ({ ...p, outlet_default: JSON.parse(v) })); } catch { console.warn("Invalid outlet_default"); }
     }
-
-    // reset agar tidak trigger ulang
-    router.setParams({
-      updatedField: undefined,
-      updatedValue: undefined,
-    });
+    router.setParams({ updatedField: undefined, updatedValue: undefined });
   }, [params.updatedField, params.updatedValue]);
 
-  /* =========================
-     UI
-  ========================== */
-
   return (
-    <View style={styles.container}>
+    <ScrollView 
+      style={styles.container}
+      // ✅ Gunakan contentContainerStyle untuk padding dinamis
+      contentContainerStyle={{
+        paddingTop: insets.top + 10, // Menyesuaikan notch/status bar + margin kecil
+        paddingBottom: insets.bottom + 100, // Ruang untuk Bottom Nav agar tidak tertutup
+        paddingHorizontal: 16,
+      }}
+    >
       {/* ================= AVATAR ================= */}
       <View style={styles.avatarContainer}>
         <TouchableOpacity onPress={() => router.push("/profil/ubahFoto")}>
@@ -160,10 +135,7 @@ export default function ProfilAkun() {
         <List.Item
           title="Outlet Aktif"
           right={() => (
-            <RightValue
-              text={profile.outlet_default?.name || "Atur Sekarang"}
-              warning={!profile.outlet_default}
-            />
+            <RightValue text={profile.outlet_default?.name || "Atur Sekarang"} warning={!profile.outlet_default} />
           )}
           onPress={() => router.push("/profil/editOutlet")}
         />
@@ -174,40 +146,13 @@ export default function ProfilAkun() {
         <List.Item
           title="Nama"
           right={() => <RightValue text={profile.name || "Atur Sekarang"} />}
-          onPress={() =>
-            router.push({
-              pathname: "/profil/modal/[field]",
-              params: {
-                id: profile.uid,
-                field: "name",
-                label: "Nama",
-                value: profile.name,
-                rootPath,
-                basePath,
-              },
-            })
-          }
+          onPress={() => router.push({ pathname: "/profil/modal/[field]", params: { id: profile.uid, field: "name", label: "Nama", value: profile.name, rootPath, basePath } })}
         />
-
         <View style={styles.divider} />
-
         <List.Item
           title="Alamat"
-          right={() => (
-            <RightValue text={profile.address || "Atur Sekarang"} />
-          )}
-          onPress={() =>
-            router.push({
-              pathname: "/profil/modal/[field]",
-              params: {
-                field: "address",
-                label: "Alamat",
-                value: profile.address,
-                rootPath,
-                basePath,
-              },
-            })
-          }
+          right={() => <RightValue text={profile.address || "Atur Sekarang"} />}
+          onPress={() => router.push({ pathname: "/profil/modal/[field]", params: { id: profile.uid, field: "address", label: "Alamat", value: profile.address, rootPath, basePath } })}
         />
       </View>
 
@@ -215,42 +160,14 @@ export default function ProfilAkun() {
       <View style={styles.sectionCard}>
         <List.Item
           title="Jenis Kelamin"
-          right={() => (
-            <RightValue text={profile.gender || "Atur Sekarang"} />
-          )}
-          onPress={() =>
-            router.push({
-              pathname: "/profil/modal/[field]",
-              params: {
-                field: "gender",
-                label: "Jenis Kelamin",
-                value: profile.gender,
-                rootPath,
-                basePath,
-              },
-            })
-          }
+          right={() => <RightValue text={profile.gender || "Atur Sekarang"} />}
+          onPress={() => router.push({ pathname: "/profil/modal/[field]", params: { id: profile.uid, field: "gender", label: "Jenis Kelamin", value: profile.gender, rootPath, basePath } })}
         />
-
         <View style={styles.divider} />
-
         <List.Item
           title="Tanggal Lahir"
-          right={() => (
-            <RightValue text={profile.birthday || "Atur Sekarang"} />
-          )}
-          onPress={() =>
-            router.push({
-              pathname: "/profil/modal/[field]",
-              params: {
-                field: "birthday",
-                label: "Tanggal Lahir",
-                value: profile.birthday,
-                rootPath,
-                basePath,
-              },
-            })
-          }
+          right={() => <RightValue text={formatDateID(profile.birthday) || "Atur Sekarang"} />}
+          onPress={() => router.push({ pathname: "/profil/modal/[field]", params: { id: profile.uid, field: "birthday", label: "Tanggal Lahir", value: profile.birthday, rootPath, basePath } })}
         />
       </View>
 
@@ -258,46 +175,14 @@ export default function ProfilAkun() {
       <View style={styles.sectionCard}>
         <List.Item
           title="No. Handphone"
-          right={() => (
-            <RightValue
-              text={maskPhone(profile.phone) || "Atur Sekarang"}
-            />
-          )}
-          onPress={() =>
-            router.push({
-              pathname: "/profil/modal/[field]",
-              params: {
-                field: "phone",
-                label: "No. Handphone",
-                value: profile.phone,
-                rootPath,
-                basePath,
-              },
-            })
-          }
+          right={() => <RightValue text={maskPhone(profile.phone) || "Atur Sekarang"} />}
+          onPress={() => router.push({ pathname: "/profil/modal/[field]", params: { id: profile.uid, field: "phone", label: "No. Handphone", value: profile.phone, rootPath, basePath } })}
         />
-
         <View style={styles.divider} />
-
         <List.Item
           title="Email"
-          right={() => (
-            <RightValue
-              text={maskEmail(profile.email) || "Atur Sekarang"}
-            />
-          )}
-          onPress={() =>
-            router.push({
-              pathname: "/profil/modal/[field]",
-              params: {
-                field: "email",
-                label: "Email",
-                value: profile.email,
-                rootPath,
-                basePath,
-              },
-            })
-          }
+          right={() => <RightValue text={maskEmail(profile.email) || "Atur Sekarang"} />}
+          onPress={() => router.push({ pathname: "/profil/modal/[field]", params: { id: profile.uid, field: "email", label: "Email", value: profile.email, rootPath, basePath } })}
         />
       </View>
 
@@ -306,34 +191,27 @@ export default function ProfilAkun() {
         title="Logout"
         left={() => <List.Icon icon="logout" />}
         onPress={async () => {
-          try {
-            await signOut();
-          } catch (err) {
-            console.warn("Logout error (ignored):", err);
-          } finally {
+          try { await signOut(); } catch (err) { console.warn("Logout error:", err); } finally {
             useAuthStore.getState().logout();
             router.replace("/auth/login");
           }
         }}
       />
-    </View>
+    </ScrollView>
   );
 }
-
-/* ================= STYLES ================= */
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#F4F4F4",
-    paddingHorizontal: 16,
   },
   avatarContainer: {
     alignItems: "center",
     paddingVertical: 28,
     backgroundColor: "#FFFFFF",
     borderRadius: 12,
-    marginTop: 16,
+    marginTop: 8, // Margin dikurangi karena sudah ada insets.top
     marginBottom: 20,
   },
   editPhotoText: {
@@ -344,8 +222,8 @@ const styles = StyleSheet.create({
   sectionCard: {
     backgroundColor: "#FFFFFF",
     borderRadius: 12,
-    marginBottom: 22,
-    paddingLeft: 12,
+    marginBottom: 20,
+    paddingLeft: 4,
     overflow: "hidden",
   },
   divider: {
@@ -356,7 +234,6 @@ const styles = StyleSheet.create({
   rightContainer: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
   },
   rightText: {
     color: "#555",

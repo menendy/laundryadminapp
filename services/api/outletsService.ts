@@ -41,19 +41,44 @@ export const getOutletList = async (
   limit = 10,
   mode: "name" = "name"
 ): Promise<OutletListResponse> => {
+  try {
+    const params = new URLSearchParams();
 
- const params = new URLSearchParams();
+    params.append("rootPath", rootPath);
+    params.append("basePath", basePath);
 
-  params.append("rootPath", rootPath);
-  params.append("basePath", basePath);
+    if (search) params.append("search", search);
+    if (cursor) params.append("cursor", cursor);
 
-  if (search) params.append("search", search);
-  if (cursor) params.append("cursor", cursor);
+    params.append("limit", limit.toString());
+    params.append("mode", mode);
 
-  params.append("limit", limit.toString());
-  params.append("mode", mode);
-  const res = await api.get(`/getOutletList?${params.toString()}`);
-  return res.data;     // 🟢 jika success langsung return
+    const res = await api.get(`/getOutletList?${params.toString()}`);
+
+    // 🔥 Tambahan: Cek manual jika success false tapi status 200
+    if (res.data && res.data.success === false) {
+       return {
+         success: false,
+         data: [],
+         message: res.data.message || "Terjadi kesalahan pada server",
+         status: 200
+       };
+    }
+
+    return res.data;
+
+  } catch (err: any) {
+    console.error("❌ getOutletList error:", err);
+
+    // 🔥 TANGKAP ERROR (Pola Benchmark)
+    // Ini yang membuat pesan error muncul di Snackbar lewat Hook
+    return {
+      success: false,
+      data: [],
+      message: err?.response?.data?.message || "Gagal memuat data outlet",
+      status: err?.response?.status || 500
+    };
+  }
 };
 
 

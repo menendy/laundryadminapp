@@ -1,4 +1,4 @@
-import React, { memo, useState } from "react";
+import React, { memo, useCallback } from "react";
 import {
   View,
   FlatList,
@@ -8,22 +8,25 @@ import {
   Pressable,
   Platform,
   ToastAndroid,
+  StyleSheet,
 } from "react-native";
 import { Card, List, ActivityIndicator } from "react-native-paper";
 import Clipboard from "@react-native-clipboard/clipboard";
-import Animated, { ZoomIn, ZoomOut } from "react-native-reanimated";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 
 import { getOutletList } from "../../services/api/outletsService";
 import AppHeaderList from "../../components/ui/AppHeaderList";
 import AppSearchBarBottomSheet from "../../components/ui/AppSearchBarBottomSheet";
-import { useUniversalPaginatedList } from "../../hooks/UniversalPaginatedList";
+import { useUniversalPaginatedList } from "../../hooks/useUniversalPaginatedList"; // Gunakan versi TanStack
 import { useBasePath } from "../../utils/useBasePath";
 
-/* CARD ITEM */
-const OutletItem = memo(({ item, onEdit }: any) => {
+// ================================
+// ITEM COMPONENT (Optimized)
+// ================================
+const OutletItem = memo(({ item, onEdit }: { item: any; onEdit: (i: any) => void }) => {
   const copyId = () => {
+    if (!item?.id) return;
     Clipboard.setString(item.id);
     if (Platform.OS === "android") {
       ToastAndroid.show("ID berhasil disalin!", ToastAndroid.SHORT);
@@ -31,64 +34,31 @@ const OutletItem = memo(({ item, onEdit }: any) => {
   };
 
   return (
-    <Card
-      style={{
-        backgroundColor: "#fff",
-        borderRadius: 16,
-        borderWidth: 1,
-        borderColor: "#eee",
-        marginHorizontal: 12,
-        marginBottom: 14,
-      }}
-    >
+    <Card style={styles.card}>
       <List.Item
         title={item.name}
-        titleStyle={{ marginBottom: 6, fontWeight: "bold", fontSize: 17 }}
-        description={
-          <View style={{ marginTop: 4 }}>
-            {/* Alamat */}
-            <View style={{ flexDirection: "row", marginBottom: 3 }}>
-              <Text style={{ fontSize: 14, fontWeight: "600" }}>Alamat :</Text>
-              <Text style={{ fontSize: 14, marginLeft: 3 }}>
-                {item.address}
-              </Text>
+        titleStyle={styles.title}
+        description={() => (
+          <View style={styles.descContainer}>
+            <View style={styles.infoRow}>
+              <Text style={styles.label}>Alamat :</Text>
+              <Text style={styles.value}>{item.address}</Text>
             </View>
 
-            {/* Telepon */}
-            <View style={{ flexDirection: "row", marginBottom: 3 }}>
-              <Text style={{ fontSize: 14, fontWeight: "600" }}>Telepon :</Text>
-              <Text style={{ fontSize: 14, marginLeft: 3 }}>
-                {item.phone}
-              </Text>
+            <View style={styles.infoRow}>
+              <Text style={styles.label}>Telepon :</Text>
+              <Text style={styles.value}>{item.phone}</Text>
             </View>
 
-            {/* ID */}
-            <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <Text style={{ fontSize: 12, color: "#666", marginRight: 8 }}>
-                {item.id}
-              </Text>
-              <Pressable onPress={copyId}>
-                <MaterialCommunityIcons
-                  name="content-copy"
-                  size={18}
-                  color="#666"
-                  style={{ marginTop: -3, marginLeft: -5 }}
-                />
-              </Pressable>
-            </View>
+            <Pressable onPress={copyId} style={styles.idRow}>
+              <Text style={styles.idText}>{item.id}</Text>
+              <MaterialCommunityIcons name="content-copy" size={16} color="#999" />
+            </Pressable>
           </View>
-        }
-        descriptionNumberOfLines={6}
+        )}
         right={() => (
-          <Pressable
-            onPress={() => onEdit(item)}
-            style={{ paddingHorizontal: 3 }}
-          >
-            <MaterialCommunityIcons
-              name="chevron-right"
-              size={28}
-              color="#a3a1a1ff"
-            />
+          <Pressable onPress={() => onEdit(item)} style={styles.chevron}>
+            <MaterialCommunityIcons name="chevron-right" size={28} color="#ccc" />
           </Pressable>
         )}
       />
@@ -96,41 +66,31 @@ const OutletItem = memo(({ item, onEdit }: any) => {
   );
 });
 
-
+// ================================
+// MAIN SCREEN
+// ================================
 export default function OutletListScreen() {
   const router = useRouter();
-
   const { rootBase: rootPath, basePath } = useBasePath();
 
-  const list = useUniversalPaginatedList({
+  // Integrasi TanStack Query via Hook
+  const list = useUniversalPaginatedList<any, "name">({
     rootPath,
     basePath,
     fetchFn: getOutletList,
     defaultMode: "name",
   });
 
-  const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
-
-  const renderItem = ({ item }: any) => (
+  // Render item di-memo agar scrolling tetap halus (60 FPS)
+  const renderItem = useCallback(({ item }: any) => (
     <OutletItem
       item={item}
-      activeMenuId={activeMenuId}
-      onOpenMenu={() => setActiveMenuId(item.id)}
-      onCloseMenu={() => setActiveMenuId(null)}
-      onDetail={() => {
-        setActiveMenuId(null);
-        router.push(`/outlets/${item.id}`);
-      }}
-      onEdit={() => {
-        setActiveMenuId(null);
-        router.push(`/outlets/edit/${item.id}`);
-      }}
+      onEdit={(i) => router.push(`/outlets/edit/${i.id}`)}
     />
-  );
+  ), []);
 
   return (
-    <View style={{ flex: 1, backgroundColor: "#f9f9f9" }}>
-
+    <View style={styles.screen}>
       <AppHeaderList
         title="Daftar Outlet"
         onAdd={() => router.push("/outlets/add")}
@@ -140,23 +100,22 @@ export default function OutletListScreen() {
         value={list.search}
         onChangeText={list.setSearch}
         mode={list.mode}
-        onChangeMode={(m) => list.setMode(m)}
+        // Casting 'm' menjadi tipe yang diharapkan oleh setMode
+        onChangeMode={(m) => list.setMode(m as "name")}
         placeholder="Cari nama outlet..."
         categories={[{ label: "Nama", value: "name" }]}
-        defaultMode="name"
       />
 
+      {/* State Loading Awal */}
       {list.loading && list.items.length === 0 && (
-        <View style={{ paddingTop: 40 }}>
+        <View style={styles.centerLoading}>
           <ActivityIndicator size="large" />
         </View>
       )}
 
       <FlatList
-        style={{ flex: 1 }}
-        contentContainerStyle={{ paddingBottom: 100 }}
         data={list.items}
-        keyExtractor={(i) => i.id}
+        keyExtractor={(item) => item.id}
         renderItem={renderItem}
         refreshControl={
           <RefreshControl
@@ -164,24 +123,50 @@ export default function OutletListScreen() {
             onRefresh={list.onRefresh}
           />
         }
-        onEndReachedThreshold={0.4}
         onEndReached={list.onEndReached}
+        onEndReachedThreshold={0.5}
+        contentContainerStyle={styles.listContent}
         ListEmptyComponent={
           !list.loading ? (
-            <Text style={{ textAlign: "center", marginTop: 20, color: "#777" }}>
-              Belum ada data outlet
-            </Text>
+            <Text style={styles.emptyText}>Belum ada data outlet</Text>
           ) : null
         }
         ListFooterComponent={
           list.loading && list.items.length > 0 ? (
-            <ActivityIndicator style={{ marginVertical: 20 }} />
+            <ActivityIndicator style={styles.footerLoader} />
           ) : null
         }
         keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-        onScrollBeginDrag={() => Keyboard.dismiss()}
+        onScrollBeginDrag={Keyboard.dismiss}
       />
     </View>
   );
 }
+
+// ================================
+// STYLES (Clean & Robust)
+// ================================
+const styles = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: "#f9f9f9" },
+  card: {
+    backgroundColor: "#fff",
+    borderRadius: 12,
+    marginHorizontal: 12,
+    marginBottom: 12,
+    elevation: 2,
+    borderWidth: Platform.OS === "ios" ? 1 : 0,
+    borderColor: "#eee",
+  },
+  title: { fontWeight: "bold", fontSize: 16, color: "#333" },
+  descContainer: { marginTop: 4 },
+  infoRow: { flexDirection: "row", marginBottom: 3, flexWrap: "wrap" },
+  label: { fontSize: 13, fontWeight: "600", color: "#555" },
+  value: { fontSize: 13, color: "#666", marginLeft: 4, flexShrink: 1 },
+  idRow: { flexDirection: "row", alignItems: "center", marginTop: 4 },
+  idText: { fontSize: 11, color: "#999", marginRight: 6 },
+  chevron: { justifyContent: "center", paddingRight: 4 },
+  centerLoading: { paddingTop: 40 },
+  listContent: { paddingBottom: 100 },
+  emptyText: { textAlign: "center", marginTop: 40, color: "#999" },
+  footerLoader: { marginVertical: 20 },
+});
