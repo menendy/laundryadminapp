@@ -1,14 +1,18 @@
 import React, { useState, useCallback, useEffect } from "react";
 import { View, ScrollView, StyleSheet } from "react-native";
 import { List, ActivityIndicator } from "react-native-paper";
-import { useRouter, useGlobalSearchParams, useFocusEffect } from "expo-router"; // ✅ Tambahkan useFocusEffect
+import { useRouter, useGlobalSearchParams, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import AppHeaderActions from "../../../components/ui/AppHeaderActions";
 import SectionListCard from "../../../components/ui/SectionListCard";
 import ToggleSwitch from "../../../components/ui/ToggleSwitch";
 
-import { getAksesPenggunaById, deleteAksesPengguna, updateAksesPengguna } from "../../../services/api/aksesPenggunaService";
+import {
+  getAksesPenggunaById,
+  deleteAksesPengguna,
+  updateAksesPengguna
+} from "../../../services/api/aksesPenggunaService";
 import { useSnackbarStore } from "../../../store/useSnackbarStore";
 import { useBasePath } from "../../../utils/useBasePath";
 import ConfirmBottomSheet from "../../../modals/ConfirmBottomSheet";
@@ -36,13 +40,11 @@ export default function EditAksesPenggunaScreen() {
   const [errors, setErrors] = useState<any>({});
 
   /* ======================================================
-     🔥 LOAD DATA (WITH FOCUS GUARD & PARAMETER GUARD)
+       🔥 LOAD DATA (WITH FOCUS GUARD & PARAMETER GUARD)
      ====================================================== */
   useFocusEffect(
     useCallback(() => {
       // ✅ 1. PARAMETER GUARD:
-      // Jika terdeteksi ada parameter update dari modal, JANGAN jalankan fetch ulang.
-      // Ini mencegah loading spinner muncul dan mencegah data lokal tertimpa data lama server.
       if (params.updatedField) return;
 
       let isMounted = true;
@@ -51,7 +53,6 @@ export default function EditAksesPenggunaScreen() {
         if (!id) return;
 
         // ✅ 2. CONDITIONAL LOADING:
-        // Hanya tampilkan spinner jika data benar-benar masih kosong (First Load).
         if (!name) {
           setInitialLoading(true);
         }
@@ -79,15 +80,13 @@ export default function EditAksesPenggunaScreen() {
       loadData();
 
       return () => {
-        // Cleanup: Hentikan update state jika user pindah screen sebelum API selesai
         isMounted = false;
       };
-      // Masukkan dependencies yang relevan
     }, [id, rootPath, basePath, params.updatedField])
   );
 
   /* ======================================================
-     🔥 REALTIME UPDATE DARI MODAL (router.setParams)
+       🔥 REALTIME UPDATE DARI MODAL (router.setParams)
      ====================================================== */
   useEffect(() => {
     if (params.updatedField && params.updatedValue !== undefined) {
@@ -98,8 +97,7 @@ export default function EditAksesPenggunaScreen() {
       if (f === "desc") setDesc(String(v));
       if (f === "active") setActive(v === "true" || v === true);
 
-      // ✅ PENTING: Bersihkan params agar Parameter Guard di useFocusEffect 
-      // bisa terbuka kembali jika user keluar-masuk halaman ini lagi.
+      // ✅ PENTING: Bersihkan params
       router.setParams({
         updatedField: undefined,
         updatedValue: undefined,
@@ -129,7 +127,13 @@ export default function EditAksesPenggunaScreen() {
       if (!ok) return false;
 
       showSnackbar("Berhasil dihapus", "success");
-      router.replace("/akses_pengguna");
+      
+      // 👇 UPDATE DISINI: Kirim sinyal refreshTimestamp
+      router.replace({
+        pathname: "/akses_pengguna",
+        params: { refreshTimestamp: Date.now().toString() }
+      });
+      
       return true;
     } catch (err) {
       handleBackendError(err, setErrors, showSnackbar);

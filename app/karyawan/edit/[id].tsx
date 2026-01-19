@@ -186,6 +186,8 @@ export default function EditKaryawanScreen() {
     }
   };
 
+  // app\karyawan\edit\[id].tsx
+
   const handleDelete = async () => {
     try {
       setSaving(true);
@@ -194,7 +196,14 @@ export default function EditKaryawanScreen() {
       if (!ok) return false;
 
       showSnackbar("Berhasil dihapus", "success");
-      router.replace("/karyawan");
+
+      // 🔥 PERUBAHAN DISINI:
+      // Kirim parameter 'refresh' dengan nilai timestamp agar selalu dianggap baru
+      router.replace({
+        pathname: "/karyawan",
+        params: { refreshTimestamp: Date.now().toString() }
+      });
+
       return true;
     } catch (err) {
       handleBackendError(err, setErrors, showSnackbar);

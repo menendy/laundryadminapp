@@ -13,7 +13,8 @@ import {
 import { Card, List, ActivityIndicator } from "react-native-paper";
 import Clipboard from "@react-native-clipboard/clipboard";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+// 👇 Import useFocusEffect untuk mendeteksi saat layar aktif
+import { useRouter, useLocalSearchParams, useFocusEffect } from "expo-router";
 
 import { getGlobalUserList } from "../../services/api/globaluserService";
 import AppHeaderList from "../../components/ui/AppHeaderList";
@@ -82,14 +83,33 @@ export default function GlobalUserListScreen() {
   const router = useRouter();
   const { rootBase: rootPath, basePath } = useBasePath();
 
+  // 👇 Tangkap parameter refreshTimestamp dari halaman Delete
+  const params = useLocalSearchParams<{ refreshTimestamp?: string }>();
+
   // Integrasi TanStack Query via Hook
-  // Definisikan tipe mode agar tidak terjadi error "name vs string"
   const list = useUniversalPaginatedList<any, "nama" | "telp" | "email">({
     rootPath,
     basePath,
     fetchFn: getGlobalUserList,
     defaultMode: "nama",
   });
+
+  // 👇 LOGIC AUTO REFRESH
+  // Dijalankan setiap kali layar ini menjadi fokus (aktif)
+  useFocusEffect(
+    useCallback(() => {
+      // Jika ada parameter refreshTimestamp (dikirim dari Delete/Edit)
+      if (params.refreshTimestamp) {
+        console.log("♻️ Data berubah, melakukan refresh otomatis...");
+        
+        // Panggil fungsi refresh bawaan hook list
+        list.onRefresh();
+
+        // Bersihkan parameter agar tidak refresh berulang-ulang
+        router.setParams({ refreshTimestamp: undefined });
+      }
+    }, [params.refreshTimestamp, list.onRefresh])
+  );
 
   // Memoized render function agar scrolling tetap halus (60 FPS)
   const renderItem = useCallback(({ item }: any) => (

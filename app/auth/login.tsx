@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import { View, Pressable, Text, Platform } from "react-native";
-// ✅ 1. Tambahkan import TextInput dari react-native-paper
 import { Button, TextInput } from "react-native-paper";
 import { useRouter } from "expo-router";
 
@@ -28,6 +27,9 @@ import ValidatedInput from "../../components/ui/ValidatedInput";
 // 🔥 IMPORT QUERY CLIENT
 import { useQueryClient } from "@tanstack/react-query";
 
+// 🔥 IMPORT AUTH STORE
+import { useAuthStore } from "../../store/useAuthStore";
+
 export default function LoginScreen() {
   const router = useRouter();
   const showSnackbar = useSnackbarStore((s) => s.showSnackbar);
@@ -36,12 +38,17 @@ export default function LoginScreen() {
   // 🔥 INISIALISASI QUERY CLIENT
   const queryClient = useQueryClient();
 
+  // ✅ FIX 1: STATE LOADING TERPISAH
+  const [emailLoading, setEmailLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+
+  // Helper: Disable input jika ada proses apapun
+  const isAnyLoading = emailLoading || googleLoading;
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
-  // ✅ 2. State untuk mengatur visibilitas password (default: true / tersembunyi)
   const [isPasswordSecure, setIsPasswordSecure] = useState(true);
 
   // ============================
@@ -59,29 +66,39 @@ export default function LoginScreen() {
       // 1️⃣ Panggil Backend untuk set Custom Claims
       await loginUser({ uid: user.uid });
 
-      // ✅ FIX 1: PAKSA REFRESH TOKEN
-      await user.getIdToken(true); 
+      // ✅ FIX 2: PAKSA REFRESH TOKEN
+      const token = await user.getIdToken(true); 
 
-      // ✅ FIX 2: STOP & BERSIHKAN TOTAL
+      // ✅ FIX 3: FORCE UPDATE ZUSTAND STORE
+      const userData = {
+        uid: user.uid,
+        email: user.email || "",
+      };
+
+      // Panggil aksi 'login' dari store secara manual
+      useAuthStore.getState().login(userData, null, token);
+
+      // ✅ FIX 4: BERSIHKAN QUERY CACHE
       await queryClient.cancelQueries(); 
+      queryClient.removeQueries(); 
       queryClient.clear(); 
 
-      // ✅ FIX 3: NAVIGASI DENGAN JEDA
+      // ✅ FIX 5: NAVIGASI
       setTimeout(() => {
         router.replace("/");
-      }, 500); 
+      }, 100); 
 
       return true;
     } catch (err: any) {
       const data = err?.response?.data;
 
-      // 🔥 BACKEND ERROR → SNACKBAR SAJA
+      // 🔥 BACKEND ERROR → SNACKBAR
       if (data?.message) {
         showSnackbar(data.message, "error");
-        return false; // ⛔ stop flow
+        return false; 
       }
 
-      // 🔥 ERROR TEKNIS → lempar ke atas
+      // 🔥 ERROR TEKNIS
       throw err;
     }
   };
@@ -91,8 +108,9 @@ export default function LoginScreen() {
   // ============================
   const handleLogin = async () => {
     try {
-      setLoading(true);
-      setFormError(null); // Reset error form
+      // 🔥 Gunakan state khusus email
+      setEmailLoading(true);
+      setFormError(null); 
 
       if (Platform.OS === "web") {
         await signInWithEmailWeb(webAuth.current, email, password);
@@ -108,7 +126,8 @@ export default function LoginScreen() {
 
       showSnackbar(message, "error");
     } finally {
-      setLoading(false);
+      // 🔥 Matikan loading email saja
+      setEmailLoading(false);
     }
   };
 
@@ -116,8 +135,10 @@ export default function LoginScreen() {
   // 🔑 LOGIN GOOGLE
   // ============================
   const handleLoginGoogle = async () => {
+    if (googleLoading) return;
+
     try {
-      setLoading(true);
+      setGoogleLoading(true);
 
       if (Platform.OS === "web") {
         await signInWithGooglePopup();
@@ -127,19 +148,46 @@ export default function LoginScreen() {
 
       await afterLoginSuccess();
     } catch (err: any) {
-      const message =
-        firebaseErrorMessages[err?.code] ||
-        "Tidak dapat login. Periksa email dan password Anda.";
+      console.log("Google Login Error Full:", err); 
 
-      showSnackbar(message, "error");
+      // ✅ FIX FINAL: DETEKSI ERROR CUSTOM "idToken kosong"
+      const errString = String(err);
+      const errCode = err.code ? String(err.code) : "";
+      const errMessage = err.message ? String(err.message).toLowerCase() : "";
+
+      const isCancelled = 
+        // 1. Web & Native Codes Standard
+        errCode === "auth/popup-closed-by-user" ||       
+        errCode === "auth/cancelled-popup-request" ||    
+        errCode === "auth/user-cancelled" ||             
+        errCode === "12501" ||                           
+        errCode === "13" ||
+        errCode === "SIGN_IN_CANCELLED" ||               
+        errCode === "-5" ||                              
+        
+        // 2. Message Check
+        errMessage.includes("cancel") ||              
+        
+        // 3. 🔥 KHUSUS ERROR DARI HELPER ANDA (Berdasarkan Log)
+        errString.includes("idToken kosong"); 
+
+      if (isCancelled) {
+        //console.log("User membatalkan login Google (Terdeteksi)");
+        // Silent return, loading mati di finally
+        return;
+      } else {
+        // Tampilkan error asli jika bukan cancel
+        const fallbackMsg = err.message || "Terjadi kesalahan saat login Google";
+        const message = firebaseErrorMessages[err?.code] || fallbackMsg;
+          
+        showSnackbar(message, "error");
+      }
     } finally {
-      setLoading(false);
+      setGoogleLoading(false);
     }
   };
-
   return (
     <View style={{ padding: 20, marginTop: 60 }}>
-      {/* HEADER / LOGO JIKA ADA */}
       <Text style={{ fontSize: 24, fontWeight: "bold", textAlign: "center", marginBottom: 30 }}>
         Login Aplikasi
       </Text>
@@ -150,31 +198,34 @@ export default function LoginScreen() {
         onChangeText={setEmail} 
         autoCapitalize="none"
         keyboardType="email-address"
+        // Disable input saat salah satu proses berjalan
+        //disabled={isAnyLoading} 
       />
       
-      {/* ✅ 3. Update ValidatedInput Password dengan Icon Toggle */}
       <ValidatedInput
         label="Password"
         value={password}
         onChangeText={setPassword}
-        // Gunakan state untuk menentukan hidden/show
         secureTextEntry={isPasswordSecure}
-        // Tambahkan tombol mata di sebelah kanan
+        //disabled={isAnyLoading}
         right={
           <TextInput.Icon 
             icon={isPasswordSecure ? "eye" : "eye-off"} 
-            onPress={() => setIsPasswordSecure(!isPasswordSecure)} 
+            onPress={() => setIsPasswordSecure(!isPasswordSecure)}
             forceTextInputFocus={false}
             style={{ marginRight: 25 }}
           />
         }
       />
 
+      {/* 👇 TOMBOL LOGIN EMAIL */}
       <Button
         mode="contained"
         onPress={handleLogin}
-        loading={loading}
-        disabled={loading}
+        // 🔥 HANYA Loading jika 'emailLoading' true
+        loading={emailLoading}
+        // Disabled jika emailLoading true ATAU googleLoading true
+        disabled={isAnyLoading}
         style={{ marginTop: 12 }}
       >
         Login
@@ -215,10 +266,14 @@ export default function LoginScreen() {
         </Text>
       )}
 
+      {/* 👇 TOMBOL LOGIN GOOGLE */}
       <Button
         mode="outlined"
         onPress={handleLoginGoogle}
-        disabled={loading}
+        // 🔥 HANYA Loading jika 'googleLoading' true
+        loading={googleLoading}
+        // Disabled jika salah satu loading
+        disabled={isAnyLoading}
         icon="google"
         style={{ borderColor: "#4285F4" }}
         labelStyle={{ color: "#4285F4", fontWeight: "600" }}

@@ -13,12 +13,13 @@ import {
 import { Card, List, ActivityIndicator } from "react-native-paper";
 import Clipboard from "@react-native-clipboard/clipboard";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+// 👇 1. UPDATE IMPORT: Tambahkan useFocusEffect dan useLocalSearchParams
+import { useRouter, useFocusEffect, useLocalSearchParams } from "expo-router";
 
 import { getOwnerList } from "../../services/api/ownersService";
 import AppHeaderList from "../../components/ui/AppHeaderList";
 import AppSearchBarBottomSheet from "../../components/ui/AppSearchBarBottomSheet";
-import { useUniversalPaginatedList } from "../../hooks/useUniversalPaginatedList"; // Gunakan hook versi TanStack
+import { useUniversalPaginatedList } from "../../hooks/useUniversalPaginatedList";
 import { useBasePath } from "../../utils/useBasePath";
 
 // ============================================================
@@ -88,6 +89,9 @@ export default function OwnerListScreen() {
   const router = useRouter();
   const { rootBase: rootPath, basePath } = useBasePath();
 
+  // 👇 2. TANGKAP PARAMETER REFRESH
+  const params = useLocalSearchParams<{ refreshTimestamp?: string }>();
+
   // Integrasi TanStack Query via Hook
   const list = useUniversalPaginatedList<any, "nama" | "telp" | "email">({
     rootPath,
@@ -95,6 +99,23 @@ export default function OwnerListScreen() {
     fetchFn: getOwnerList,
     defaultMode: "nama",
   });
+
+  // 👇 3. LOGIC AUTO REFRESH
+  // Dijalankan setiap kali layar ini menjadi fokus (aktif)
+  useFocusEffect(
+    useCallback(() => {
+      // Jika ada parameter refreshTimestamp (dikirim dari Delete/Edit)
+      if (params.refreshTimestamp) {
+        console.log("♻️ Data berubah, melakukan refresh otomatis...");
+        
+        // Panggil fungsi refresh bawaan hook list
+        list.onRefresh();
+
+        // Bersihkan parameter agar tidak refresh berulang-ulang
+        router.setParams({ refreshTimestamp: undefined });
+      }
+    }, [params.refreshTimestamp, list.onRefresh])
+  );
 
   // Render item di-memo agar scrolling tetap halus (60 FPS)
   const renderItem = useCallback(({ item }: any) => (
@@ -115,7 +136,6 @@ export default function OwnerListScreen() {
         value={list.search}
         onChangeText={list.setSearch}
         mode={list.mode}
-        // FIX: Casting 'm' agar sesuai dengan tipe union di hook (Menghilangkan error VS Code)
         onChangeMode={(m) => list.setMode(m as "nama" | "telp" | "email")}
         categories={[
           { label: "Nama", value: "nama" },

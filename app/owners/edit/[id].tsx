@@ -62,14 +62,9 @@ export default function EditOwnerScreen() {
 
   /* ================= LOAD DATA (WITH FOCUS GUARD & PARAMETER GUARD) ================= */
 
-  /**
-   * ✅ STRATEGI: Menggunakan useFocusEffect + Parameter Guard.
-   * Mencegah pemanggilan API ulang jika user baru saja kembali dari Modal Edit.
-   */
   useFocusEffect(
     useCallback(() => {
-      // 🔥 GUARD 1: Jika terdeteksi ada parameter update dari modal, JANGAN jalankan fetch ulang.
-      // Ini mencegah loading spinner muncul dan mencegah data lokal tertimpa data lama server.
+      // 🔥 GUARD 1: Jika ada parameter update dari modal, JANGAN fetch ulang.
       if (params.updatedField) return;
 
       let isMounted = true;
@@ -77,7 +72,7 @@ export default function EditOwnerScreen() {
       const loadData = async () => {
         if (!id) return;
 
-        // 🔥 GUARD 2: Hanya tampilkan spinner jika data benar-benar masih kosong (First Load).
+        // 🔥 GUARD 2: Hanya tampilkan spinner jika data masih kosong
         if (!data.name) {
           setLoading(true);
         }
@@ -108,10 +103,9 @@ export default function EditOwnerScreen() {
       loadData();
 
       return () => {
-        isMounted = false; // Cleanup: matikan update state jika pindah screen
+        isMounted = false;
       };
-      // Masukkan updatedField ke dependency agar useCallback peka terhadap perubahan status update
-    }, [id, rootPath, basePath, params.updatedField]) 
+    }, [id, rootPath, basePath, params.updatedField])
   );
 
   /* ================= REALTIME UPDATE SYNC ================= */
@@ -122,14 +116,11 @@ export default function EditOwnerScreen() {
     const f = params.updatedField;
     const v = params.updatedValue ?? "";
 
-    // Update state secara lokal agar UI berubah seketika tanpa menunggu API
     if (f === "name") setData((p) => ({ ...p, name: v }));
     if (f === "phone") setData((p) => ({ ...p, phone: v.replace(/^(\+62|62)/, "") }));
     if (f === "email") setData((p) => ({ ...p, email: v }));
     if (f === "active") setActive(v === "true" || v === "1");
 
-    // ✅ PENTING: Bersihkan params agar Parameter Guard di useFocusEffect 
-    // bisa terbuka kembali jika user benar-benar keluar-masuk halaman ini lagi.
     router.setParams({
       updatedField: undefined,
       updatedValue: undefined,
@@ -174,7 +165,13 @@ export default function EditOwnerScreen() {
       if (!ok) return false;
 
       showSnackbar("Berhasil dihapus", "success");
-      router.replace("/owners"); 
+      
+      // 👇 PERUBAHAN PENTING DISINI: Kirim sinyal refreshTimestamp
+      router.replace({
+        pathname: "/owners",
+        params: { refreshTimestamp: Date.now().toString() }
+      }); 
+      
       return true;
     } catch (err) {
       handleBackendError(err, setErrors, showSnackbar);

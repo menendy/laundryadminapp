@@ -21,6 +21,9 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 
+// 👇 IMPORT TAMBAHAN PENTING
+import { useQueryClient } from "@tanstack/react-query"; 
+
 import AppHeaderList from "../../components/ui/AppHeaderList";
 import { TreeItem } from "../../components/pages_admin2/tree";
 import { usePagesAdminState } from "../../components/pages_admin2/state";
@@ -35,6 +38,9 @@ export default function PagesAdmin2() {
   const insets = useSafeAreaInsets();
   const showSnackbar = useSnackbarStore((s) => s.showSnackbar);
   
+  // 👇 2. AMBIL INSTANCE QUERY CLIENT (Sama dengan yg di _layout.tsx)
+  const queryClient = useQueryClient();
+  
   // ✅ 2. DETEKSI PLATFORM & UKURAN LAYAR
   const { width } = useWindowDimensions();
   
@@ -45,7 +51,6 @@ export default function PagesAdmin2() {
   const isSmallWeb = Platform.OS === 'web' && width < 768; 
 
   // ✅ 3. LOGIKA BLOCKER (EARLY RETURN)
-  // Jika ini Native App ATAU Web Layar Kecil, TAMPILKAN INFO & STOP RENDER DndContext
   if (isNativeApp || isSmallWeb) {
      return (
         <View style={{ flex: 1, backgroundColor: "#f8fafc", justifyContent: "center", alignItems: "center", padding: 20 }}>
@@ -54,8 +59,8 @@ export default function PagesAdmin2() {
                 padding: 30, 
                 borderRadius: 20, 
                 alignItems: "center", 
-                elevation: 4, // Shadow android
-                shadowColor: "#000", // Shadow iOS
+                elevation: 4, 
+                shadowColor: "#000", 
                 shadowOffset: { width: 0, height: 2 },
                 shadowOpacity: 0.1,
                 shadowRadius: 4,
@@ -86,8 +91,7 @@ export default function PagesAdmin2() {
   }
 
   // =====================================================================
-  // KODE DI BAWAH INI HANYA AKAN DIJALANKAN DI WEB DESKTOP
-  // (Sehingga error getBoundingClientRect tidak akan muncul di HP)
+  // KODE WEB DESKTOP
   // =====================================================================
 
   const [openAddDialog, setOpenAddDialog] = useState(false);
@@ -190,6 +194,12 @@ export default function PagesAdmin2() {
       if (ok) {
         showSnackbar("Struktur berhasil disimpan!", "success");
         setDirty(false);
+
+        // 🔥 3. INVALIDASI CACHE GLOBAL
+        // Ini memaksa React Query membuang semua data lama dan fetch ulang dari server.
+        // Hasilnya: RBAC check akan tereksekusi ulang di backend untuk semua halaman.
+        await queryClient.invalidateQueries(); 
+        console.log("♻️ Cache invalidated globally!");
       }
 
     } catch (err: any) {

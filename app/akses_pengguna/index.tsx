@@ -13,12 +13,13 @@ import {
 import { Card, List, ActivityIndicator } from "react-native-paper";
 import Clipboard from "@react-native-clipboard/clipboard";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+// 👇 1. Update Import
+import { useRouter, useLocalSearchParams, useFocusEffect } from "expo-router";
 
 import { getAksesAdminList } from "../../services/api/aksesPenggunaService";
 import AppHeaderList from "../../components/ui/AppHeaderList";
 import AppSearchBarBottomSheet from "../../components/ui/AppSearchBarBottomSheet";
-import { useUniversalPaginatedList } from "../../hooks/useUniversalPaginatedList"; // Versi TanStack
+import { useUniversalPaginatedList } from "../../hooks/useUniversalPaginatedList";
 import { useBasePath } from "../../utils/useBasePath";
 
 // ============================================================
@@ -76,6 +77,9 @@ export default function AksesPenggunaListScreen() {
   const router = useRouter();
   const { rootBase: rootPath, basePath } = useBasePath();
 
+  // 👇 2. Tangkap parameter refreshTimestamp
+  const params = useLocalSearchParams<{ refreshTimestamp?: string }>();
+
   // Integrasi TanStack Query via Hook
   const list = useUniversalPaginatedList<any, "name">({
     rootPath,
@@ -83,6 +87,19 @@ export default function AksesPenggunaListScreen() {
     fetchFn: getAksesAdminList,
     defaultMode: "name",
   });
+
+  // 👇 3. Logic Auto Refresh
+  useFocusEffect(
+    useCallback(() => {
+      // Jika ada sinyal refresh dari halaman edit/delete
+      if (params.refreshTimestamp) {
+        console.log("♻️ Auto-refresh Akses Pengguna triggered...");
+        list.onRefresh();
+        // Bersihkan parameter
+        router.setParams({ refreshTimestamp: undefined });
+      }
+    }, [params.refreshTimestamp, list.onRefresh])
+  );
 
   // Memoized render function untuk performa FlatList
   const renderItem = useCallback(({ item }: any) => (
@@ -103,7 +120,6 @@ export default function AksesPenggunaListScreen() {
         value={list.search}
         onChangeText={list.setSearch}
         mode={list.mode}
-        // Gunakan 'as any' atau casting ke tipe mode yang spesifik
         onChangeMode={(m) => list.setMode(m as "name")}
         placeholder="Cari nama akses..."
         categories={[{ label: "Nama", value: "name" }]}

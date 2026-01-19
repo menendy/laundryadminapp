@@ -47,12 +47,24 @@ const queryClient = new QueryClient({
   }),
   defaultOptions: {
     queries: {
-      // Config Global untuk query lain (seperti list data)
-      staleTime: 1000 * 60 * 5, // 5 Menit
-      gcTime: 1000 * 60 * 5,
+     // 🔥 1. DATA SELALU BASI DETIK ITU JUGA
+      // Ini memaksa React Query untuk selalu melakukan request ke server 
+      // setiap kali komponen di-mount atau window focus.
+      staleTime: 0, 
+
+      // 2. SIMPAN CACHE 5 MENIT
+      // Data lama tetap disimpan di memori agar user tidak melihat layar putih (blank)
+      // saat loading. User lihat data lama dulu, baru update otomatis.
+      gcTime: 1000 * 60 * 5, 
+      
       networkMode: "online",
+      
+      // 🔥 3. TRIGGER REFRESH OTOMATIS
+      refetchOnMount: true,       // Pindah Halaman -> Refresh
+      refetchOnWindowFocus: false, // Buka App dari background -> Refresh
+      refetchOnReconnect: true,   // Internet nyala lagi -> Refresh
+      
       retry: 0,
-      refetchOnWindowFocus: false,
     },
   },
 });

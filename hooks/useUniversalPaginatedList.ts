@@ -77,8 +77,8 @@ export function useUniversalPaginatedList<T, M extends string>({
         isFocused &&      // Layar harus fokus (visual)
         isRouteMatch,     // URL harus cocok (logic) - INI KUNCINYA
 
-    staleTime: Infinity,
-    refetchOnMount: false,
+    //staleTime: Infinity,
+    //refetchOnMount: false,
     retry: false, 
   });
 

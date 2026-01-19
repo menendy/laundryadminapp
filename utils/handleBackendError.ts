@@ -1,13 +1,11 @@
 import axios from "axios";
 
-/**
- * UNIVERSAL ERROR HANDLER
- */
 export const handleBackendError = (
   input: any,
   setErrors: (e: any) => void,
   showSnackbar: (msg: string, type?: any) => void
 ) => {
+  // ============ AXIOS ERROR ============
   if (axios.isAxiosError(input)) {
     const err = input;
 
@@ -18,7 +16,16 @@ export const handleBackendError = (
 
     const { status, data } = err.response;
 
-    // 1️⃣ PRIORITAS: FORM VALIDATION ERROR ARRAY
+    // 🔥 PERUBAHAN DISINI:
+    // Tangkap 401 & 403, lalu ambil 'data.message' dari API.
+    // Jika API mengirim: {"message": "Halaman tidak aktif"}, maka itu yang muncul.
+    if (status === 401 || status === 403) {
+      const apiMessage = data?.message || "Akses ditolak";
+      showSnackbar(apiMessage, "error");
+      return false;
+    }
+
+    // 1. Form Validation Error (400)
     if (status === 400 && Array.isArray(data?.errors)) {
       const formatted: Record<string, string> = {};
       data.errors.forEach((e: any) => {
@@ -29,7 +36,6 @@ export const handleBackendError = (
       return false;
     }
 
-    // 2️⃣ Single-field validation response in Axios
     if (status === 400 && data?.field && data?.message) {
       setErrors({ [data.field]: data.message });
       showSnackbar("Lengkapi data dengan benar", "error");
@@ -41,22 +47,11 @@ export const handleBackendError = (
       return false;
     }
 
-    if (status === 401) {
-      showSnackbar("Akses ditolak. Anda tidak memiliki izin.", "error");
-      return false;
-    }
-
-    if (status === 403) {
-      showSnackbar("Anda tidak dapat mengakses fitur ini.", "error");
-      return false;
-    }
-
     showSnackbar(data?.message || "Terjadi kesalahan pada server.", "error");
     return false;
   }
 
-  // ============ Non-Axios backend response ============
-
+  // ============ NON-AXIOS (STANDARD RESPONSE) ============
   const result = input;
   if (!result) {
     showSnackbar("Terjadi kesalahan server", "error");
@@ -65,7 +60,14 @@ export const handleBackendError = (
 
   if (result.success) return true;
 
-  // 1️⃣ PRIORITAS: ARRAY VALIDATION
+  // 🔥 PERUBAHAN DISINI JUGA (Untuk respon sukses:false tapi status 403)
+  if (result.status === 401 || result.status === 403) {
+     const apiMessage = result.message || "Akses ditolak";
+     showSnackbar(apiMessage, "error");
+     return false;
+  }
+
+  // Validasi Array
   if (Array.isArray(result.errors)) {
     const formatted: Record<string, string> = {};
     result.errors.forEach((err: any) => {
@@ -76,7 +78,6 @@ export const handleBackendError = (
     return false;
   }
 
-  // 2️⃣ Single-field validation
   if (result?.field && result?.message) {
     setErrors({ [result.field]: result.message });
     showSnackbar("Lengkapi data dengan benar", "error");

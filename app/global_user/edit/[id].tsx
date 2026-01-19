@@ -177,7 +177,10 @@ useFocusEffect(
             if (!ok) return false;
 
             showSnackbar("Berhasil dihapus", "success");
-            router.replace("/global_user");
+           router.replace({
+    pathname: "/global_user",
+    params: { refreshTimestamp: Date.now().toString() }
+});
             return true;
         } finally {
             setSaving(false);

@@ -13,12 +13,13 @@ import {
 import { Card, List, ActivityIndicator } from "react-native-paper";
 import Clipboard from "@react-native-clipboard/clipboard";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+// 👇 1. UPDATE IMPORT
+import { useRouter, useLocalSearchParams, useFocusEffect } from "expo-router";
 
 import { getSysadminList } from "../../services/api/sysadminService";
 import AppHeaderList from "../../components/ui/AppHeaderList";
 import AppSearchBarBottomSheet from "../../components/ui/AppSearchBarBottomSheet";
-import { useUniversalPaginatedList } from "../../hooks/useUniversalPaginatedList"; // Versi TanStack
+import { useUniversalPaginatedList } from "../../hooks/useUniversalPaginatedList";
 import { useBasePath } from "../../utils/useBasePath";
 
 // ============================================================
@@ -82,6 +83,9 @@ export default function SysadminListScreen() {
   const router = useRouter();
   const { rootBase: rootPath, basePath } = useBasePath();
 
+  // 👇 2. TANGKAP PARAMETER REFRESH
+  const params = useLocalSearchParams<{ refreshTimestamp?: string }>();
+
   // Integrasi TanStack Query via Hook
   const list = useUniversalPaginatedList<any, "nama" | "telp" | "email">({
     rootPath,
@@ -89,6 +93,23 @@ export default function SysadminListScreen() {
     fetchFn: getSysadminList,
     defaultMode: "nama",
   });
+
+  // 👇 3. LOGIC AUTO REFRESH
+  // Dijalankan setiap kali layar ini menjadi fokus (aktif)
+  useFocusEffect(
+    useCallback(() => {
+      // Jika ada parameter refreshTimestamp (dikirim dari Delete/Edit)
+      if (params.refreshTimestamp) {
+        console.log("♻️ Data berubah, melakukan refresh otomatis...");
+        
+        // Panggil fungsi refresh bawaan hook list
+        list.onRefresh();
+
+        // Bersihkan parameter agar tidak refresh berulang-ulang
+        router.setParams({ refreshTimestamp: undefined });
+      }
+    }, [params.refreshTimestamp, list.onRefresh])
+  );
 
   // Render item di-memo agar scrolling tetap halus (60 FPS)
   const renderItem = useCallback(({ item }: any) => (
@@ -109,7 +130,6 @@ export default function SysadminListScreen() {
         value={list.search}
         onChangeText={list.setSearch}
         mode={list.mode}
-        // FIX: Casting 'm' agar sesuai dengan tipe union di hook (Garis merah VS Code hilang)
         onChangeMode={(m) => list.setMode(m as "nama" | "telp" | "email")}
         placeholder="Cari nama / telp / email..."
         categories={[
